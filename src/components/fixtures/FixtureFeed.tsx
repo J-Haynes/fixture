@@ -29,36 +29,17 @@ export function FixtureFeed({ fixtures }: Props) {
       bucket.push(f);
       map.set(key, bucket);
     }
-    return Array.from(map.entries()); // already in chronological order (or reversed for results)
+    return Array.from(map.entries());
   }, [fixtures, view]);
 
   return (
-    <div>
-      {/* View toggle */}
-      <div className="sticky top-14 z-10 bg-white/95 backdrop-blur border-b border-slate-100">
-        <div className="flex max-w-lg mx-auto">
-          {(['upcoming', 'results'] as View[]).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`flex-1 py-3 text-sm font-medium capitalize transition-colors ${
-                view === v
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-slate-500 hover:text-slate-700 border-b-2 border-transparent'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Feed */}
-      <div className="max-w-lg mx-auto w-full px-4 py-5 space-y-7">
+    <>
+      {/* Scrollable feed — padding-bottom clears the fixed bottom nav */}
+      <div className="pb-24 max-w-lg mx-auto w-full px-4 py-5 space-y-7">
         {grouped.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
+          <div className="text-center py-20 text-zinc-600">
             <p className="text-4xl mb-3">📭</p>
-            <p className="font-medium">
+            <p className="font-medium text-zinc-500">
               {view === 'upcoming' ? 'No upcoming fixtures' : 'No recent results'}
             </p>
           </div>
@@ -68,6 +49,28 @@ export function FixtureFeed({ fixtures }: Props) {
           ))
         )}
       </div>
-    </div>
+
+      {/* Fixed bottom navigation */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-20 bg-zinc-900 border-t border-zinc-800"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex max-w-lg mx-auto">
+          {(['upcoming', 'results'] as View[]).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`flex-1 py-4 text-sm font-medium capitalize transition-colors ${
+                view === v
+                  ? 'text-emerald-400'
+                  : 'text-zinc-500 hover:text-zinc-400'
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </nav>
+    </>
   );
 }

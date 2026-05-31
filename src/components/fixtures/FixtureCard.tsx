@@ -15,23 +15,21 @@ export function FixtureCard({ fixture }: Props) {
   } = fixture;
 
   const isTeamMatch = homeTeam && awayTeam;
-  const showScore = status === 'finished' || status === 'live';
-  const minute = typeof sportMeta?.minute === 'number' ? sportMeta.minute : undefined;
   const sportEmoji = getSportEmoji(league.sport?.slug ?? '');
 
   return (
-    <article className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+    <article className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
       {/* League strip */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-100">
-        <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+      <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/60 border-b border-zinc-800">
+        <span className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
           <span aria-hidden="true">{sportEmoji}</span>
           {league.shortName ?? league.name}
           {league.country && (
-            <span className="text-slate-400">· {league.country}</span>
+            <span className="text-zinc-600">· {league.country}</span>
           )}
         </span>
         {round && (
-          <span className="text-xs text-slate-400 truncate max-w-[40%] text-right">{round}</span>
+          <span className="text-xs text-zinc-500 truncate max-w-[40%] text-right">{round}</span>
         )}
       </div>
 
@@ -43,17 +41,11 @@ export function FixtureCard({ fixture }: Props) {
             awayTeam={awayTeam}
             scheduledAt={scheduledAt}
             status={status}
-            showScore={showScore}
             homeScore={homeScore}
             awayScore={awayScore}
-            minute={minute}
           />
         ) : (
-          <EventLayout
-            round={round}
-            status={status}
-            sportMeta={sportMeta}
-          />
+          <EventLayout round={round} status={status} sportMeta={sportMeta} />
         )}
       </div>
     </article>
@@ -67,63 +59,78 @@ interface TeamMatchProps {
   awayTeam: NonNullable<Fixture['awayTeam']>;
   scheduledAt: string;
   status: Fixture['status'];
-  showScore: boolean;
   homeScore?: number;
   awayScore?: number;
-  minute?: number;
 }
 
-function TeamMatchLayout({
-  homeTeam, awayTeam, scheduledAt, status,
-  showScore, homeScore, awayScore, minute,
-}: TeamMatchProps) {
+function TeamMatchLayout({ homeTeam, awayTeam, scheduledAt, status, homeScore, awayScore }: TeamMatchProps) {
   return (
     <div className="flex items-center gap-2">
       {/* Home team */}
       <div className="flex-1 flex flex-col items-center gap-1.5">
         <TeamAvatar team={homeTeam} />
-        <span className="text-xs font-semibold text-slate-700 text-center leading-tight">
-          {homeTeam.shortName ?? homeTeam.name}
+        <span className="text-xs font-semibold text-zinc-200 text-center leading-tight">
+          {homeTeam.name}
         </span>
       </div>
 
       {/* Centre: score / time / status */}
-      <div className="flex flex-col items-center gap-1 w-20 shrink-0">
-        {showScore ? (
-          <div className="flex items-center gap-1.5">
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">{homeScore}</span>
-            <span className="text-slate-300 text-lg">–</span>
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">{awayScore}</span>
-          </div>
-        ) : status === 'postponed' || status === 'cancelled' ? (
-          <StatusBadge status={status} />
-        ) : (
-          <span className="text-sm font-semibold text-slate-700 tabular-nums">
-            {formatKickoffTime(scheduledAt)}
-          </span>
-        )}
-
-        {status === 'live' && minute !== undefined && (
-          <span className="text-xs font-bold text-green-600">{minute}&prime;</span>
-        )}
-
-        {(status === 'finished' || status === 'live') && (
-          <StatusBadge status={status} />
-        )}
+      <div className="flex flex-col items-center gap-1.5 w-20 shrink-0">
+        <CentreDisplay
+          status={status}
+          scheduledAt={scheduledAt}
+          homeScore={homeScore}
+          awayScore={awayScore}
+        />
       </div>
 
       {/* Away team */}
       <div className="flex-1 flex flex-col items-center gap-1.5">
         <TeamAvatar team={awayTeam} />
-        <span className="text-xs font-semibold text-slate-700 text-center leading-tight">
-          {awayTeam.shortName ?? awayTeam.name}
+        <span className="text-xs font-semibold text-zinc-200 text-center leading-tight">
+          {awayTeam.name}
         </span>
       </div>
     </div>
   );
 }
 
-// ── Non-team event layout (F1, golf, etc.) ───────────────────────────────────
+interface CentreProps {
+  status: Fixture['status'];
+  scheduledAt: string;
+  homeScore?: number;
+  awayScore?: number;
+}
+
+function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProps) {
+  switch (status) {
+    case 'finished':
+      return (
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className="text-2xl font-bold text-white tabular-nums">{homeScore}</span>
+            <span className="text-zinc-600 text-lg">–</span>
+            <span className="text-2xl font-bold text-white tabular-nums">{awayScore}</span>
+          </div>
+          <StatusBadge status="finished" />
+        </>
+      );
+    case 'live':
+      return <StatusBadge status="live" />;
+    case 'postponed':
+    case 'cancelled':
+      return <StatusBadge status={status} />;
+    default:
+      // scheduled
+      return (
+        <span className="text-sm font-semibold text-zinc-300 tabular-nums">
+          {formatKickoffTime(scheduledAt)}
+        </span>
+      );
+  }
+}
+
+// ── Non-team event layout (future: golf, F1, etc.) ───────────────────────────
 
 interface EventLayoutProps {
   round?: string;
@@ -132,29 +139,23 @@ interface EventLayoutProps {
 }
 
 function EventLayout({ round, status, sportMeta }: EventLayoutProps) {
-  const podium = Array.isArray(sportMeta?.podium)
-    ? (sportMeta.podium as string[])
-    : undefined;
+  const podium = Array.isArray(sportMeta?.podium) ? (sportMeta.podium as string[]) : undefined;
 
   return (
     <div className="text-center py-1 space-y-2">
-      {round && (
-        <p className="font-semibold text-slate-800">{round}</p>
-      )}
+      {round && <p className="font-semibold text-zinc-100">{round}</p>}
       {status === 'finished' && podium && (
         <ol className="space-y-0.5">
           {podium.slice(0, 3).map((name, i) => (
-            <li key={i} className="text-sm text-slate-500">
-              <span className="font-medium text-slate-700">{i + 1}.</span> {name}
+            <li key={i} className="text-sm text-zinc-400">
+              <span className="font-medium text-zinc-300">{i + 1}.</span> {name}
             </li>
           ))}
         </ol>
       )}
-      {status !== 'scheduled' && (
-        <div className="flex justify-center">
-          <StatusBadge status={status} />
-        </div>
-      )}
+      <div className="flex justify-center">
+        <StatusBadge status={status} />
+      </div>
     </div>
   );
 }

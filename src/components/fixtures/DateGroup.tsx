@@ -10,7 +10,7 @@ interface Props {
 export function DateGroup({ dateKey, fixtures }: Props) {
   return (
     <section>
-      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+      <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
         {formatDateHeading(dateKey)}
       </h2>
       <div className="space-y-3">

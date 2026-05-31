@@ -1,11 +1,11 @@
 import Image from 'next/image';
 import type { Team } from '@/lib/types';
 
-// Deterministic colour per team based on id — stays consistent until logos arrive.
+// Deterministic colour per team — replaced by real logos when available.
 const COLOURS = [
-  'bg-blue-500', 'bg-red-500',    'bg-emerald-500', 'bg-purple-500',
-  'bg-amber-500', 'bg-indigo-500', 'bg-pink-500',    'bg-cyan-500',
-  'bg-orange-500', 'bg-teal-500',  'bg-violet-500',  'bg-rose-500',
+  'bg-blue-600',   'bg-red-600',    'bg-emerald-600', 'bg-purple-600',
+  'bg-amber-600',  'bg-indigo-600', 'bg-pink-600',    'bg-cyan-600',
+  'bg-orange-600', 'bg-teal-600',   'bg-violet-600',  'bg-rose-600',
 ];
 
 const SIZE_MAP = {
@@ -30,14 +30,14 @@ export function TeamAvatar({ team, size = 'md' }: Props) {
         alt={team.name}
         width={px}
         height={px}
-        className={`${cls} rounded-full object-contain`}
+        className={`${cls} rounded-lg object-contain`}
       />
     );
   }
 
   return (
     <div
-      className={`${cls} ${colour} rounded-full flex items-center justify-center text-white font-bold shrink-0`}
+      className={`${cls} ${colour} rounded-lg flex items-center justify-center text-white font-bold shrink-0`}
       aria-label={team.name}
     >
       {initials}

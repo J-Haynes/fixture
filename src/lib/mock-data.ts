@@ -1,125 +1,153 @@
 import type { Fixture, League, Sport, Team } from './types';
 
-const SPORTS = {
-  football:   { id: 1, name: 'Football',   slug: 'football'   } satisfies Sport,
-  basketball: { id: 2, name: 'Basketball', slug: 'basketball' } satisfies Sport,
-  formula1:   { id: 3, name: 'Formula 1',  slug: 'formula-1'  } satisfies Sport,
+const RUGBY: Sport = { id: 1, name: 'Rugby Union', slug: 'rugby' };
+
+const SUPER_RUGBY: League = {
+  id: 1,
+  sportId: 1,
+  sport: RUGBY,
+  name: 'Super Rugby Pacific',
+  shortName: 'SRP',
+  slug: 'super-rugby-pacific',
+  country: 'International',
 };
 
-const LEAGUES: Record<string, League> = {
-  premierLeague: {
-    id: 1, sportId: 1, sport: SPORTS.football,
-    name: 'Premier League', shortName: 'PL', slug: 'premier-league', country: 'England',
-  },
-  laLiga: {
-    id: 2, sportId: 1, sport: SPORTS.football,
-    name: 'La Liga', shortName: 'LaLiga', slug: 'la-liga', country: 'Spain',
-  },
-  championsLeague: {
-    id: 3, sportId: 1, sport: SPORTS.football,
-    name: 'UEFA Champions League', shortName: 'UCL', slug: 'champions-league', country: 'Europe',
-  },
-  nba: {
-    id: 4, sportId: 2, sport: SPORTS.basketball,
-    name: 'NBA', shortName: 'NBA', slug: 'nba', country: 'USA',
-  },
-  f1: {
-    id: 5, sportId: 3, sport: SPORTS.formula1,
-    name: 'Formula 1', shortName: 'F1', slug: 'formula-1', country: 'International',
-  },
+// 11 teams — official Super Rugby Pacific 2026 roster
+const T: Record<string, Team> = {
+  blues:       { id: 1,  sportId: 1, name: 'Blues',             shortName: 'BLU', slug: 'blues',          logoUrl: '/blues.png',         country: 'New Zealand' },
+  chiefs:      { id: 2,  sportId: 1, name: 'Chiefs',            shortName: 'CHI', slug: 'chiefs',         logoUrl: '/chiefs.svg',        country: 'New Zealand' },
+  crusaders:   { id: 3,  sportId: 1, name: 'Crusaders',         shortName: 'CRU', slug: 'crusaders',      logoUrl: '/crusaders.png', country: 'New Zealand' },
+  highlanders: { id: 4,  sportId: 1, name: 'Highlanders',       shortName: 'HIG', slug: 'highlanders',    logoUrl: '/highlanders.png', country: 'New Zealand' },
+  hurricanes:  { id: 5,  sportId: 1, name: 'Hurricanes',        shortName: 'HUR', slug: 'hurricanes',     logoUrl: '/hurricanes.png',       country: 'New Zealand' },
+  brumbies:    { id: 6,  sportId: 1, name: 'ACT Brumbies',      shortName: 'BRU', slug: 'brumbies',       logoUrl: '/brumbies.svg', country: 'Australia'   },
+  reds:        { id: 7,  sportId: 1, name: 'Queensland Reds',   shortName: 'RED', slug: 'reds',           logoUrl: '/reds.png', country: 'Australia'   },
+  waratahs:    { id: 8,  sportId: 1, name: 'NSW Waratahs',      shortName: 'WAR', slug: 'waratahs',       logoUrl: '/waratahs.svg', country: 'Australia'   },
+  force:       { id: 9,  sportId: 1, name: 'Western Force',     shortName: 'FOR', slug: 'force',          logoUrl: '/westernforce.png', country: 'Australia'   },
+  drua:        { id: 10, sportId: 1, name: 'Fijian Drua',       shortName: 'DRU', slug: 'fijian-drua',    logoUrl: '/drua.png', country: 'Fiji'        },
+  moana:       { id: 11, sportId: 1, name: 'Moana Pasifika',    shortName: 'MOA', slug: 'moana-pasifika', logoUrl: '/moana.png', country: 'Pacific'     },
 };
 
-const TEAMS: Record<string, Team> = {
-  arsenal:    { id: 1,  sportId: 1, name: 'Arsenal',                shortName: 'ARS', slug: 'arsenal',          country: 'England' },
-  chelsea:    { id: 2,  sportId: 1, name: 'Chelsea',                shortName: 'CHE', slug: 'chelsea',          country: 'England' },
-  manCity:    { id: 3,  sportId: 1, name: 'Man City',               shortName: 'MCI', slug: 'manchester-city',  country: 'England' },
-  liverpool:  { id: 4,  sportId: 1, name: 'Liverpool',              shortName: 'LIV', slug: 'liverpool',        country: 'England' },
-  tottenham:  { id: 5,  sportId: 1, name: 'Tottenham',              shortName: 'TOT', slug: 'tottenham',        country: 'England' },
-  realMadrid: { id: 6,  sportId: 1, name: 'Real Madrid',            shortName: 'RMA', slug: 'real-madrid',      country: 'Spain'   },
-  barcelona:  { id: 7,  sportId: 1, name: 'Barcelona',              shortName: 'BAR', slug: 'barcelona',        country: 'Spain'   },
-  atletico:   { id: 8,  sportId: 1, name: 'Atlético Madrid',        shortName: 'ATM', slug: 'atletico-madrid',  country: 'Spain'   },
-  psg:        { id: 9,  sportId: 1, name: 'PSG',                    shortName: 'PSG', slug: 'psg',              country: 'France'  },
-  lakers:     { id: 10, sportId: 2, name: 'LA Lakers',              shortName: 'LAL', slug: 'la-lakers',        country: 'USA'     },
-  warriors:   { id: 11, sportId: 2, name: 'Golden State Warriors',  shortName: 'GSW', slug: 'gsw',              country: 'USA'     },
-  celtics:    { id: 12, sportId: 2, name: 'Boston Celtics',         shortName: 'BOS', slug: 'celtics',          country: 'USA'     },
-};
+const srp = SUPER_RUGBY;
 
-// Dates relative to 2026-05-31 (today when this data was written).
-// Replace with DB queries when the cron pipeline is wired up.
+// Dates are UTC. NZ evening kickoffs are roughly 07:35–10:05 UTC.
+// Australian evening kickoffs are roughly 09:05–11:05 UTC.
 export const MOCK_FIXTURES: Fixture[] = [
-  // ── 2 days ago (2026-05-29) ──────────────────────────────────────────
+  // ── Round 14 · Fri 22 – Sat 23 May 2026 (finished) ──────────────────
   {
-    id: 1, seasonId: 1, league: LEAGUES.nba,
-    homeTeam: TEAMS.lakers, awayTeam: TEAMS.warriors,
-    scheduledAt: '2026-05-29T23:00:00Z', status: 'finished',
-    round: 'Western Conference Finals · Game 5',
-    homeScore: 112, awayScore: 98,
-  },
-  // ── Yesterday (2026-05-30) ───────────────────────────────────────────
-  {
-    id: 2, seasonId: 1, league: LEAGUES.premierLeague,
-    homeTeam: TEAMS.arsenal, awayTeam: TEAMS.chelsea,
-    scheduledAt: '2026-05-30T14:00:00Z', status: 'finished',
-    round: 'Matchweek 38', homeScore: 2, awayScore: 1,
+    id: 1, seasonId: 1, league: srp,
+    homeTeam: T.blues, awayTeam: T.crusaders,
+    scheduledAt: '2026-05-22T08:05:00Z', status: 'finished',
+    round: 'Round 14', homeScore: 28, awayScore: 21,
   },
   {
-    id: 3, seasonId: 1, league: LEAGUES.laLiga,
-    homeTeam: TEAMS.realMadrid, awayTeam: TEAMS.atletico,
-    scheduledAt: '2026-05-30T19:00:00Z', status: 'finished',
-    round: 'Matchweek 38', homeScore: 3, awayScore: 0,
-  },
-  // ── Today (2026-05-31) ───────────────────────────────────────────────
-  {
-    id: 4, seasonId: 1, league: LEAGUES.f1,
-    scheduledAt: '2026-05-31T13:00:00Z', status: 'finished',
-    round: 'Monaco Grand Prix',
-    sportMeta: { podium: ['Max Verstappen', 'Lewis Hamilton', 'Charles Leclerc'] },
+    id: 2, seasonId: 1, league: srp,
+    homeTeam: T.hurricanes, awayTeam: T.chiefs,
+    scheduledAt: '2026-05-22T10:05:00Z', status: 'finished',
+    round: 'Round 14', homeScore: 15, awayScore: 24,
   },
   {
-    id: 5, seasonId: 1, league: LEAGUES.premierLeague,
-    homeTeam: TEAMS.manCity, awayTeam: TEAMS.liverpool,
-    scheduledAt: '2026-05-31T14:00:00Z', status: 'live',
-    round: 'Matchweek 38', homeScore: 1, awayScore: 1,
-    sportMeta: { minute: 67 },
+    id: 3, seasonId: 1, league: srp,
+    homeTeam: T.brumbies, awayTeam: T.reds,
+    scheduledAt: '2026-05-23T07:45:00Z', status: 'finished',
+    round: 'Round 14', homeScore: 31, awayScore: 15,
   },
   {
-    id: 6, seasonId: 1, league: LEAGUES.laLiga,
-    homeTeam: TEAMS.barcelona, awayTeam: TEAMS.atletico,
-    scheduledAt: '2026-05-31T18:30:00Z', status: 'scheduled',
-    round: 'Matchweek 38',
-  },
-  // ── Tomorrow (2026-06-01) ────────────────────────────────────────────
-  {
-    id: 7, seasonId: 1, league: LEAGUES.premierLeague,
-    homeTeam: TEAMS.tottenham, awayTeam: TEAMS.arsenal,
-    scheduledAt: '2026-06-01T15:00:00Z', status: 'scheduled',
-    round: 'Matchweek 38',
+    id: 4, seasonId: 1, league: srp,
+    homeTeam: T.waratahs, awayTeam: T.drua,
+    scheduledAt: '2026-05-23T09:05:00Z', status: 'finished',
+    round: 'Round 14', homeScore: 22, awayScore: 19,
   },
   {
-    id: 8, seasonId: 1, league: LEAGUES.laLiga,
-    homeTeam: TEAMS.realMadrid, awayTeam: TEAMS.barcelona,
-    scheduledAt: '2026-06-01T19:00:00Z', status: 'postponed',
-    round: 'Matchweek 38',
+    id: 5, seasonId: 1, league: srp,
+    homeTeam: T.force, awayTeam: T.highlanders,
+    scheduledAt: '2026-05-23T11:05:00Z', status: 'finished',
+    round: 'Round 14', homeScore: 14, awayScore: 27,
   },
-  // ── 4 Jun — UCL Final ────────────────────────────────────────────────
+  // ── Round 15 · Fri 29 – Sat 30 May 2026 (finished) ──────────────────
   {
-    id: 9, seasonId: 1, league: LEAGUES.championsLeague,
-    homeTeam: TEAMS.manCity, awayTeam: TEAMS.psg,
-    scheduledAt: '2026-06-04T19:00:00Z', status: 'scheduled',
-    round: 'Final',
+    id: 6, seasonId: 1, league: srp,
+    homeTeam: T.crusaders, awayTeam: T.chiefs,
+    scheduledAt: '2026-05-29T08:05:00Z', status: 'finished',
+    round: 'Round 15', homeScore: 17, awayScore: 25,
   },
-  // ── 7 Jun — NBA Finals ───────────────────────────────────────────────
   {
-    id: 10, seasonId: 1, league: LEAGUES.nba,
-    homeTeam: TEAMS.celtics, awayTeam: TEAMS.lakers,
-    scheduledAt: '2026-06-07T23:30:00Z', status: 'scheduled',
-    round: 'NBA Finals · Game 1',
+    id: 7, seasonId: 1, league: srp,
+    homeTeam: T.blues, awayTeam: T.hurricanes,
+    scheduledAt: '2026-05-29T10:05:00Z', status: 'finished',
+    round: 'Round 15', homeScore: 34, awayScore: 17,
   },
-  // ── 12 Jun ───────────────────────────────────────────────────────────
   {
-    id: 11, seasonId: 1, league: LEAGUES.premierLeague,
-    homeTeam: TEAMS.chelsea, awayTeam: TEAMS.manCity,
-    scheduledAt: '2026-06-12T15:00:00Z', status: 'scheduled',
-    round: 'Matchweek 39',
+    id: 8, seasonId: 1, league: srp,
+    homeTeam: T.highlanders, awayTeam: T.reds,
+    scheduledAt: '2026-05-30T07:45:00Z', status: 'finished',
+    round: 'Round 15', homeScore: 22, awayScore: 15,
+  },
+  {
+    id: 9, seasonId: 1, league: srp,
+    homeTeam: T.moana, awayTeam: T.waratahs,
+    scheduledAt: '2026-05-30T07:45:00Z', status: 'finished',
+    round: 'Round 15', homeScore: 28, awayScore: 21,
+  },
+  {
+    id: 10, seasonId: 1, league: srp,
+    homeTeam: T.drua, awayTeam: T.brumbies,
+    scheduledAt: '2026-05-30T09:05:00Z', status: 'finished',
+    round: 'Round 15', homeScore: 13, awayScore: 29,
+  },
+  // ── Round 16 · Fri 5 – Sat 6 Jun 2026 (upcoming) ────────────────────
+  {
+    id: 11, seasonId: 1, league: srp,
+    homeTeam: T.chiefs, awayTeam: T.blues,
+    scheduledAt: '2026-06-05T08:05:00Z', status: 'scheduled',
+    round: 'Round 16',
+  },
+  {
+    id: 12, seasonId: 1, league: srp,
+    homeTeam: T.crusaders, awayTeam: T.hurricanes,
+    scheduledAt: '2026-06-05T10:05:00Z', status: 'scheduled',
+    round: 'Round 16',
+  },
+  {
+    id: 13, seasonId: 1, league: srp,
+    homeTeam: T.brumbies, awayTeam: T.highlanders,
+    scheduledAt: '2026-06-06T07:45:00Z', status: 'scheduled',
+    round: 'Round 16',
+  },
+  {
+    id: 14, seasonId: 1, league: srp,
+    homeTeam: T.reds, awayTeam: T.force,
+    scheduledAt: '2026-06-06T09:05:00Z', status: 'scheduled',
+    round: 'Round 16',
+  },
+  {
+    id: 15, seasonId: 1, league: srp,
+    homeTeam: T.waratahs, awayTeam: T.moana,
+    scheduledAt: '2026-06-06T09:05:00Z', status: 'scheduled',
+    round: 'Round 16',
+  },
+  // ── Round 17 · Sat 13 Jun 2026 (upcoming) ────────────────────────────
+  {
+    id: 16, seasonId: 1, league: srp,
+    homeTeam: T.blues, awayTeam: T.brumbies,
+    scheduledAt: '2026-06-13T07:35:00Z', status: 'scheduled',
+    round: 'Round 17',
+  },
+  {
+    id: 17, seasonId: 1, league: srp,
+    homeTeam: T.hurricanes, awayTeam: T.highlanders,
+    scheduledAt: '2026-06-13T08:05:00Z', status: 'scheduled',
+    round: 'Round 17',
+  },
+  {
+    id: 18, seasonId: 1, league: srp,
+    homeTeam: T.chiefs, awayTeam: T.drua,
+    scheduledAt: '2026-06-13T10:05:00Z', status: 'scheduled',
+    round: 'Round 17',
+  },
+  {
+    id: 19, seasonId: 1, league: srp,
+    homeTeam: T.reds, awayTeam: T.waratahs,
+    scheduledAt: '2026-06-13T09:05:00Z', status: 'scheduled',
+    round: 'Round 17',
   },
 ];

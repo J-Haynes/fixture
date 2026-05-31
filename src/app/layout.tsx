@@ -13,22 +13,23 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Fixture',
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: '#09090b',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} h-full`}>
-      <body className="min-h-full bg-slate-50 font-sans antialiased">
+    <html lang="en" className={geist.variable}>
+      <body className="min-h-screen bg-zinc-950 font-sans antialiased text-zinc-100">
         {children}
       </body>
     </html>
