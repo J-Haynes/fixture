@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Image from 'next/image';
 import type { Team } from '@/lib/types';
 
@@ -19,11 +22,13 @@ interface Props {
 }
 
 export function TeamAvatar({ team, size = 'md' }: Props) {
+  const [imgError, setImgError] = useState(false);
+
   const { px, cls } = SIZE_MAP[size];
   const colour = COLOURS[team.id % COLOURS.length];
   const initials = (team.shortName ?? team.name).slice(0, 3).toUpperCase();
 
-  if (team.logoUrl) {
+  if (team.logoUrl && !imgError) {
     return (
       <Image
         src={team.logoUrl}
@@ -31,6 +36,7 @@ export function TeamAvatar({ team, size = 'md' }: Props) {
         width={px}
         height={px}
         className={`${cls} rounded-lg object-contain`}
+        onError={() => setImgError(true)}
       />
     );
   }
