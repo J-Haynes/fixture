@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const securityHeaders = [
   // Enable DNS prefetching for performance
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -17,15 +19,18 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Next.js App Router requires 'unsafe-inline' for hydration scripts.
+      // React dev mode requires 'unsafe-eval' for call-stack reconstruction.
       // Upgrade to a nonce-based CSP when the app matures.
-      "script-src 'self' 'unsafe-inline'",
+      isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       // data: for inline SVGs; blob: for next/image optimised output
       "img-src 'self' data: blob:",
       // Geist is self-hosted by next/font — no external font origin needed
       "font-src 'self'",
       "connect-src 'self'",
+      // Service worker at /sw.js (same origin) — default-src 'self' covers this,
+      // but explicit worker-src is clearer and future-proof
+      "worker-src 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
