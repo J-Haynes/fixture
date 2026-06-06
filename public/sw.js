@@ -1,7 +1,9 @@
 const CACHE = 'fixture-v1';
 
 // Pre-cache the app shell on install
-const SHELL = ['/', '/manifest.json', '/icon.svg', '/icon.png', '/apple-icon.png'];
+// Only pre-cache static files — Next.js generated routes (/icon, /apple-icon)
+// are excluded here and will be cached on first fetch via the network-first handler.
+const SHELL = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(

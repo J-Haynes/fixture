@@ -123,7 +123,7 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
     default:
       // scheduled
       return (
-        <span className="text-sm font-semibold text-zinc-300 tabular-nums">
+        <span className="text-sm font-semibold text-zinc-300 tabular-nums" suppressHydrationWarning>
           {formatKickoffTime(scheduledAt)}
         </span>
       );
