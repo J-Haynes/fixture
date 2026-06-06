@@ -112,15 +112,29 @@ export async function syncFixtures(): Promise<{ upserted: number }> {
         ? parseInt(event.intAwayScore, 10) : null;
       const round      = event.intRound ? `Round ${event.intRound}` : null;
 
-      const existingId = fixtureExtMap.get(event.idEvent);
+      let existingId = fixtureExtMap.get(event.idEvent);
 
       if (existingId != null) {
-        // Update status and score if the fixture already exists
-        await db
+        const updated = await db
           .update(fixtures)
           .set({ status, homeScore, awayScore })
-          .where(eq(fixtures.id, existingId));
-      } else {
+          .where(eq(fixtures.id, existingId))
+          .returning({ id: fixtures.id });
+
+        if (updated.length === 0) {
+          // Fixture was deleted from DB but external_ids mapping still exists — clean it up
+          await db.delete(externalIds).where(
+            and(
+              eq(externalIds.entityType, 'fixture'),
+              eq(externalIds.provider, PROVIDER),
+              eq(externalIds.externalId, event.idEvent),
+            )
+          );
+          existingId = undefined;
+        }
+      }
+
+      if (existingId == null) {
         // Insert new fixture and record its external ID mapping
         const [inserted] = await db
           .insert(fixtures)

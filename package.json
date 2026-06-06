@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "sync": "dotenv -e .env.local -- sh -c 'curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/sync | jq'",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:push":   "dotenv -e .env.local -- drizzle-kit push",
