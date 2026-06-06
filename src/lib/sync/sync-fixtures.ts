@@ -41,10 +41,22 @@ function findTeamByName(
   allTeams: { id: number; name: string }[],
 ): number | undefined {
   const needle = normaliseName(tsdbName);
-  return allTeams.find(t => {
+
+  // 1. Exact / substring match
+  const bySubstring = allTeams.find(t => {
     const hay = t.name.toLowerCase();
     return hay === needle || hay.includes(needle) || needle.includes(hay);
-  })?.id;
+  });
+  if (bySubstring) return bySubstring.id;
+
+  // 2. Nickname (last word) fallback — handles "Canterbury Bankstown Bulldogs" ↔
+  //    "Canterbury Bulldogs" and TheSportsDB typos like "Illawara" ↔ "Illawarra".
+  const nickname = needle.split(/\s+/).at(-1) ?? '';
+  if (nickname.length > 3) {
+    return allTeams.find(t => t.name.toLowerCase().endsWith(nickname))?.id;
+  }
+
+  return undefined;
 }
 
 // ── Per-league sync ───────────────────────────────────────────────────────────
@@ -139,7 +151,14 @@ async function syncLeague(
     if (existingId != null) {
       const updated = await db
         .update(fixtures)
-        .set({ status, homeScore, awayScore })
+        .set({
+          status,
+          homeScore,
+          awayScore,
+          // Backfill team IDs that were null on the first sync pass
+          ...(homeTeamId != null && { homeTeamId }),
+          ...(awayTeamId != null && { awayTeamId }),
+        })
         .where(eq(fixtures.id, existingId))
         .returning({ id: fixtures.id });
 

@@ -128,12 +128,12 @@ async function main() {
       shortName: 'NRL',
       slug:      'nrl',
       country:   'Australia',
-      logoUrl:   '/logos/National_Rugby_League.svg',
+      logoUrl:   '/logos/nrl.svg',
       isActive:  true,
     })
     .onConflictDoUpdate({
       target: leagues.slug,
-      set: { name: 'National Rugby League', logoUrl: '/logos/National_Rugby_League.svg' },
+      set: { name: 'National Rugby League', logoUrl: '/logos/nrl.svg' },
     })
     .returning();
   console.log(`✓ League: ${nrl.name} (id ${nrl.id})`);
