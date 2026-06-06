@@ -18,7 +18,9 @@ export function FixtureCard({ fixture }: Props) {
   const isTeamMatch = homeTeam && awayTeam;
 
   return (
-    <article className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+    <article className={`bg-zinc-900 rounded-xl border overflow-hidden ${
+      status === 'live' ? 'border-red-500' : 'border-zinc-800'
+    }`}>
       {/* League strip */}
       <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/60 border-b border-zinc-800">
         <span className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">

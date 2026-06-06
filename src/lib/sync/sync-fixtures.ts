@@ -20,6 +20,8 @@ function mapStatus(event: TsdbEvent): FixtureStatus {
   // over the status field when both are present.
   if (event.intHomeScore != null && event.intAwayScore != null &&
       event.intHomeScore !== '' && event.intAwayScore !== '') return 'finished';
+  // Kickoff has passed but TheSportsDB hasn't marked FT yet — game is in progress.
+  if (new Date(event.strTimestamp + 'Z') < new Date()) return 'live';
   return 'scheduled';
 }
 
