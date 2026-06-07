@@ -7,22 +7,36 @@ import type { FixtureStatus } from '@/lib/types';
 const PROVIDER = 'thesportsdb';
 
 const LEAGUES_TO_SYNC = [
-  { apiId: '4551', season: '2026', slug: 'super-rugby-pacific' },
-  { apiId: '4416', season: '2026', slug: 'nrl' },
+  { apiId: '4551', season: '2026', slug: 'super-rugby-pacific', maxGameDurationHours: 3 },
+  { apiId: '4416', season: '2026', slug: 'nrl',                 maxGameDurationHours: 3 },
 ] as const;
 
 // ── Status mapping ────────────────────────────────────────────────────────────
 
-function mapStatus(event: TsdbEvent): FixtureStatus {
+function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatus {
   if (event.strPostponed === 'yes') return 'postponed';
   if (event.strStatus === 'FT')     return 'finished';
   // TheSportsDB occasionally returns "NS" for completed games — trust scores
   // over the status field when both are present.
   if (event.intHomeScore != null && event.intAwayScore != null &&
       event.intHomeScore !== '' && event.intAwayScore !== '') return 'finished';
-  // Kickoff has passed but TheSportsDB hasn't marked FT yet — game is in progress.
-  if (new Date(event.strTimestamp + 'Z') < new Date()) return 'live';
-  return 'scheduled';
+
+  const kickoff = new Date(event.strTimestamp + 'Z');
+  const now = new Date();
+
+  // Kickoff hasn't happened yet
+  if (kickoff >= now) return 'scheduled';
+
+  // Kickoff has passed — check how long ago
+  const elapsed = now.getTime() - kickoff.getTime();
+  if (elapsed > maxGameDurationHours * 60 * 60 * 1000) {
+    // Beyond the maximum game window: TheSportsDB data is stale.
+    // Mark finished so the game leaves the upcoming list.
+    return 'finished';
+  }
+
+  // Within the game window — genuinely in progress
+  return 'live';
 }
 
 // ── Team name normalisation ───────────────────────────────────────────────────
@@ -67,6 +81,7 @@ async function syncLeague(
   apiId: string,
   seasonYear: string,
   leagueSlug: string,
+  maxGameDurationHours: number,
 ): Promise<number> {
   // 1. Resolve league + season in our DB
   const [league] = await db
@@ -141,7 +156,7 @@ async function syncLeague(
       }
     }
 
-    const status    = mapStatus(event);
+    const status    = mapStatus(event, maxGameDurationHours);
     const homeScore = event.intHomeScore != null && event.intHomeScore !== ''
       ? parseInt(event.intHomeScore, 10) : null;
     const awayScore = event.intAwayScore != null && event.intAwayScore !== ''
@@ -213,8 +228,8 @@ export async function syncFixtures(): Promise<{ upserted: number }> {
   let totalUpserted = 0;
 
   try {
-    for (const { apiId, season, slug } of LEAGUES_TO_SYNC) {
-      const count = await syncLeague(apiId, season, slug);
+    for (const { apiId, season, slug, maxGameDurationHours } of LEAGUES_TO_SYNC) {
+      const count = await syncLeague(apiId, season, slug, maxGameDurationHours);
       totalUpserted += count;
     }
 

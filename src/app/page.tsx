@@ -18,7 +18,15 @@ export default async function HomePage() {
   const to = new Date(today);
   to.setDate(to.getDate() + 14); // show next 2 rounds of fixtures
 
-  const { fixtures } = await getFixtures({ from: isoDate(from), to: isoDate(to) });
+  const { fixtures: allFixtures } = await getFixtures({ from: isoDate(from), to: isoDate(to) });
+
+  // Strip stale "scheduled" games server-side so the fixture list is stable
+  // across SSR and client hydration. Any scheduled game that kicked off more
+  // than 10 minutes ago should have been marked "live" by the last sync run.
+  const syncCutoff = new Date(Date.now() - 10 * 60 * 1000);
+  const fixtures = allFixtures.filter(
+    f => f.status !== 'scheduled' || new Date(f.scheduledAt) >= syncCutoff
+  );
 
   return (
     <>

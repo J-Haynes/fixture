@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import type { Fixture } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
@@ -25,14 +24,8 @@ export function FixtureCard({ fixture }: Props) {
       <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/60 border-b border-zinc-800">
         <span className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
           {league.logoUrl ? (
-            <Image
-              src={league.logoUrl}
-              alt={league.name}
-              width={0}
-              height={16}
-              style={{ width: 'auto', height: '16px' }}
-              className="shrink-0"
-            />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={league.logoUrl} alt={league.name} className="h-4 w-auto shrink-0" />
           ) : (
             <span aria-hidden="true">{getSportEmoji(league.sport?.slug ?? '')}</span>
           )}

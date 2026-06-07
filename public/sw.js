@@ -1,4 +1,4 @@
-const CACHE = 'fixture-v1';
+const CACHE = 'fixture-v2';
 
 // Pre-cache the app shell on install
 // Only pre-cache static files — Next.js generated routes (/icon, /apple-icon)
