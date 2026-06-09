@@ -4,6 +4,15 @@ import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
 
+// Two-tone gradients drawn from each league's actual brand palette.
+// from- = primary brand colour (darkened), to- = secondary/background tone.
+const LEAGUE_BANNER: Record<string, { strip: string; divider: string; text: string }> = {
+  'nrl':                 { strip: 'bg-gradient-to-r from-zinc-950 to-green-900',  divider: 'border-green-800/50',  text: 'text-white/85' },
+  'super-rugby-pacific': { strip: 'bg-gradient-to-r from-blue-950 to-teal-900',   divider: 'border-teal-800/50',   text: 'text-white/85' },
+  'fifa-world-cup':      { strip: 'bg-gradient-to-r from-zinc-950 to-amber-700',  divider: 'border-amber-700/50',  text: 'text-white/85' },
+};
+const DEFAULT_BANNER = { strip: 'bg-zinc-800/60', divider: 'border-zinc-800', text: 'text-zinc-400' };
+
 interface Props {
   fixture: Fixture;
 }
@@ -15,14 +24,15 @@ export function FixtureCard({ fixture }: Props) {
   } = fixture;
 
   const isTeamMatch = homeTeam && awayTeam;
+  const banner = LEAGUE_BANNER[league.slug] ?? DEFAULT_BANNER;
 
   return (
     <article className={`bg-zinc-900 rounded-xl border overflow-hidden ${
       status === 'live' ? 'border-red-500' : 'border-zinc-800'
     }`}>
       {/* League strip */}
-      <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/60 border-b border-zinc-800">
-        <span className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
+      <div className={`flex items-center justify-between px-4 py-2 ${banner.strip} border-b ${banner.divider}`}>
+        <span className={`text-xs font-medium flex items-center gap-1.5 ${banner.text}`}>
           {league.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={league.logoUrl} alt={league.name} className="h-4 w-auto shrink-0" />
@@ -31,11 +41,11 @@ export function FixtureCard({ fixture }: Props) {
           )}
           {league.shortName ?? league.name}
           {league.country && (
-            <span className="text-zinc-600">· {league.country}</span>
+            <span className="opacity-50">· {league.country}</span>
           )}
         </span>
         {round && (
-          <span className="text-xs text-zinc-500 truncate max-w-[40%] text-right">{round}</span>
+          <span className={`text-xs truncate max-w-[40%] text-right ${banner.text}`}>{round}</span>
         )}
       </div>
 

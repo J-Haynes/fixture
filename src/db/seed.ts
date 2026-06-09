@@ -35,7 +35,7 @@ async function main() {
     })
     .onConflictDoUpdate({
       target: leagues.slug,
-      set: { name: 'Super Rugby Pacific', logoUrl: '/logos/Super_Rugby_Pacific_logo.png' },
+      set: { name: 'Super Rugby Pacific', shortName: null, logoUrl: '/logos/Super_Rugby_Pacific_logo.png' },
     })
     .returning();
   console.log(`✓ League: ${superRugby.name} (id ${superRugby.id})`);
@@ -197,7 +197,7 @@ async function main() {
     })
     .onConflictDoUpdate({
       target: leagues.slug,
-      set: { name: 'FIFA World Cup', logoUrl: '/logos/fifa-world-cup.png' },
+      set: { name: 'FIFA World Cup', shortName: null, logoUrl: '/logos/fifa-world-cup.png' },
     })
     .returning();
   console.log(`✓ League: ${worldCup.name} (id ${worldCup.id})`);
