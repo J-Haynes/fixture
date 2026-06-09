@@ -1,8 +1,10 @@
-const CACHE = 'fixture-v2';
+const CACHE = 'fixture-v1';
 
-// Pre-cache the app shell on install
-// Only pre-cache static files — Next.js generated routes (/icon, /apple-icon)
-// are excluded here and will be cached on first fetch via the network-first handler.
+// Only pre-cache the true app shell — static files that never change between deploys.
+// /_next/static/ assets are intentionally excluded: Next.js content-hashes them and
+// sets Cache-Control: immutable on them in production, so the browser HTTP cache
+// handles them correctly without SW involvement. Caching them here caused hydration
+// mismatches whenever the JS bundle changed (SW served stale code).
 const SHELL = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', event => {
@@ -30,26 +32,15 @@ self.addEventListener('fetch', event => {
   // Only handle same-origin GET requests
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // Skip API routes — always fresh
+  // Skip API routes — always fetch live
   if (url.pathname.startsWith('/api/')) return;
 
-  // Cache-first for immutable Next.js build assets
-  if (url.pathname.startsWith('/_next/static/')) {
-    event.respondWith(
-      caches.match(request).then(hit =>
-        hit ?? fetch(request).then(res => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(request, clone));
-          }
-          return res;
-        })
-      )
-    );
-    return;
-  }
+  // Skip /_next/static/ — the browser HTTP cache owns these.
+  // In production Next.js sets Cache-Control: max-age=31536000, immutable on every
+  // hashed chunk, so they're cached forever and bust automatically on new deploys.
+  if (url.pathname.startsWith('/_next/')) return;
 
-  // Network-first for pages and other assets (keeps content fresh)
+  // Network-first for pages and other assets (offline fallback via cache)
   event.respondWith(
     fetch(request)
       .then(res => {
