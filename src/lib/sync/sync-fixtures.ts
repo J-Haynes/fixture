@@ -59,14 +59,22 @@ function findTeamByName(
 ): number | undefined {
   const needle = normaliseName(tsdbName);
 
-  // 1. Exact / substring match
-  const bySubstring = allTeams.find(t => {
-    const hay = t.name.toLowerCase();
-    return hay === needle || hay.includes(needle) || needle.includes(hay);
-  });
-  if (bySubstring) return bySubstring.id;
+  // 1. Exact match — must be tried alone first to avoid short names (e.g. "USA")
+  //    matching as a substring of an unrelated team ("cr-USA-ders").
+  const exact = allTeams.find(t => t.name.toLowerCase() === needle);
+  if (exact) return exact.id;
 
-  // 2. Nickname (last word) fallback — handles "Canterbury Bankstown Bulldogs" ↔
+  // 2. Substring match — only for needles longer than 3 chars to avoid false
+  //    positives from short acronyms/abbreviations appearing inside other words.
+  if (needle.length > 3) {
+    const bySubstring = allTeams.find(t => {
+      const hay = t.name.toLowerCase();
+      return hay.includes(needle) || needle.includes(hay);
+    });
+    if (bySubstring) return bySubstring.id;
+  }
+
+  // 3. Nickname (last word) fallback — handles "Canterbury Bankstown Bulldogs" ↔
   //    "Canterbury Bulldogs" and TheSportsDB typos like "Illawara" ↔ "Illawarra".
   const nickname = needle.split(/\s+/).at(-1) ?? '';
   if (nickname.length > 3) {
