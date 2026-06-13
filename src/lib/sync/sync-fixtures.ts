@@ -1,20 +1,46 @@
 import { eq, and } from 'drizzle-orm';
 import { db } from '@/db';
 import { fixtures, teams, seasons, leagues, externalIds, syncLog } from '@/db/schema';
-import { fetchSeasonEvents, type TsdbEvent } from './thesportsdb';
+import { fetchSeasonEvents, fetchEventResults, type TsdbEvent } from './thesportsdb';
 import type { FixtureStatus } from '@/lib/types';
 
 const PROVIDER = 'thesportsdb';
 
-const LEAGUES_TO_SYNC = [
+interface LeagueConfig {
+  apiId:                string;
+  season:               string;
+  slug:                 string;
+  maxGameDurationHours: number;
+  /** Call eventresults.php for finished events to populate sportMeta.podium */
+  fetchResults?:        boolean;
+  /** Use strEvent as the round/title label instead of "Round N" */
+  eventNameAsLabel?:    boolean;
+  /** Drop events that don't pass this filter (e.g. practice sessions) */
+  sessionFilter?:       (event: TsdbEvent) => boolean;
+}
+
+const LEAGUES_TO_SYNC: LeagueConfig[] = [
   { apiId: '4551', season: '2026', slug: 'super-rugby-pacific', maxGameDurationHours: 3 },
   { apiId: '4416', season: '2026', slug: 'nrl',                 maxGameDurationHours: 3 },
   { apiId: '4429', season: '2026', slug: 'fifa-world-cup',      maxGameDurationHours: 3 },
-] as const;
+  {
+    apiId: '4370', season: '2026', slug: 'formula-1',
+    maxGameDurationHours: 4,
+    fetchResults:     true,
+    eventNameAsLabel: true,
+    // Skip practice sessions and testing days; keep races, sprints, qualifying
+    sessionFilter: e => !/(Practice|Testing|Sprint Qualifying)/i.test(e.strEvent),
+  },
+  {
+    apiId: '4489', season: '2026', slug: 'v8-supercars',
+    maxGameDurationHours: 2,
+    fetchResults:     true,
+    eventNameAsLabel: true,
+  },
+];
 
 // ── Status mapping ────────────────────────────────────────────────────────────
 
-// TheSportsDB in-progress status codes across all sports.
 const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'PEN', 'Break', 'Live', 'Q1', 'Q2', 'Q3', 'Q4']);
 
 function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatus {
@@ -23,13 +49,12 @@ function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatu
   if (LIVE_STATUSES.has(event.strStatus))  return 'live';
 
   const kickoff = new Date(event.strTimestamp + 'Z');
-  const now = new Date();
+  const now     = new Date();
 
   if (kickoff >= now) return 'scheduled';
 
   const elapsed = now.getTime() - kickoff.getTime();
   if (elapsed > maxGameDurationHours * 60 * 60 * 1000) {
-    // Beyond the maximum game window: TheSportsDB data is stale (status stuck at "NS").
     return 'finished';
   }
 
@@ -37,14 +62,11 @@ function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatu
 }
 
 // ── Team name normalisation ───────────────────────────────────────────────────
-// TheSportsDB appends league names as suffixes (e.g. "Blues Super Rugby",
-// "Brisbane Broncos NRL"). Strip those, then substring-match against our teams
-// to handle short names ("Brumbies" ↔ "ACT Brumbies", "Reds" ↔ "Queensland Reds").
 
 function normaliseName(name: string): string {
   return name
     .replace(/\s+(Super Rugby|NRL)\s*$/i, '')
-    .replace(/\./g, '')   // "St." → "St"
+    .replace(/\./g, '')
     .trim()
     .toLowerCase();
 }
@@ -55,13 +77,9 @@ function findTeamByName(
 ): number | undefined {
   const needle = normaliseName(tsdbName);
 
-  // 1. Exact match — must be tried alone first to avoid short names (e.g. "USA")
-  //    matching as a substring of an unrelated team ("cr-USA-ders").
   const exact = allTeams.find(t => t.name.toLowerCase() === needle);
   if (exact) return exact.id;
 
-  // 2. Substring match — only for needles longer than 3 chars to avoid false
-  //    positives from short acronyms/abbreviations appearing inside other words.
   if (needle.length > 3) {
     const bySubstring = allTeams.find(t => {
       const hay = t.name.toLowerCase();
@@ -70,8 +88,6 @@ function findTeamByName(
     if (bySubstring) return bySubstring.id;
   }
 
-  // 3. Nickname (last word) fallback — handles "Canterbury Bankstown Bulldogs" ↔
-  //    "Canterbury Bulldogs" and TheSportsDB typos like "Illawara" ↔ "Illawarra".
   const nickname = needle.split(/\s+/).at(-1) ?? '';
   if (nickname.length > 3) {
     return allTeams.find(t => t.name.toLowerCase().endsWith(nickname))?.id;
@@ -82,13 +98,15 @@ function findTeamByName(
 
 // ── Per-league sync ───────────────────────────────────────────────────────────
 
-async function syncLeague(
-  apiId: string,
-  seasonYear: string,
-  leagueSlug: string,
-  maxGameDurationHours: number,
-): Promise<number> {
-  // 1. Resolve league + season in our DB
+type FixtureEntry = { id: number; sportMeta: Record<string, unknown> | null };
+
+async function syncLeague(config: LeagueConfig): Promise<number> {
+  const {
+    apiId, season: seasonYear, slug: leagueSlug,
+    maxGameDurationHours, fetchResults, eventNameAsLabel, sessionFilter,
+  } = config;
+
+  // 1. Resolve league + season
   const [league] = await db
     .select()
     .from(leagues)
@@ -111,11 +129,12 @@ async function syncLeague(
     return 0;
   }
 
-  // 2. Fetch events from TheSportsDB
-  const events = await fetchSeasonEvents(apiId, seasonYear);
+  // 2. Fetch + filter events
+  let events = await fetchSeasonEvents(apiId, seasonYear);
+  if (sessionFilter) events = events.filter(sessionFilter);
   console.log(`[sync:${leagueSlug}] ${events.length} events from API`);
 
-  // 3. Load teams + existing external_id mappings
+  // 3. Load teams + external ID mappings
   const allTeams = await db.select({ id: teams.id, name: teams.name }).from(teams);
 
   const teamMappings = await db
@@ -123,23 +142,34 @@ async function syncLeague(
     .from(externalIds)
     .where(and(eq(externalIds.entityType, 'team'), eq(externalIds.provider, PROVIDER)));
 
-  const fixtureMappings = await db
-    .select({ externalId: externalIds.externalId, entityId: externalIds.entityId })
+  // Join fixtures so we can check whether sportMeta.podium already exists
+  const fixtureMappingRows = await db
+    .select({
+      externalId: externalIds.externalId,
+      entityId:   externalIds.entityId,
+      sportMeta:  fixtures.sportMeta,
+    })
     .from(externalIds)
+    .leftJoin(fixtures, eq(fixtures.id, externalIds.entityId))
     .where(and(eq(externalIds.entityType, 'fixture'), eq(externalIds.provider, PROVIDER)));
 
   const teamExtMap    = new Map(teamMappings.map(m => [m.externalId, m.entityId]));
-  const fixtureExtMap = new Map(fixtureMappings.map(m => [m.externalId, m.entityId]));
+  const fixtureExtMap = new Map<string, FixtureEntry>(
+    fixtureMappingRows.map(m => [
+      m.externalId,
+      { id: m.entityId, sportMeta: m.sportMeta as Record<string, unknown> | null },
+    ])
+  );
 
   // 4. Process each event
   let upserted = 0;
 
   for (const event of events) {
-    // Resolve home team
-    let homeTeamId = teamExtMap.get(event.idHomeTeam);
-    if (homeTeamId == null) {
+    // Resolve teams (null for motorsport events)
+    let homeTeamId = event.idHomeTeam ? teamExtMap.get(event.idHomeTeam) : undefined;
+    if (homeTeamId == null && event.strHomeTeam) {
       homeTeamId = findTeamByName(event.strHomeTeam, allTeams);
-      if (homeTeamId != null) {
+      if (homeTeamId != null && event.idHomeTeam) {
         await db.insert(externalIds).values({
           entityType: 'team', entityId: homeTeamId,
           provider: PROVIDER, externalId: event.idHomeTeam,
@@ -148,11 +178,10 @@ async function syncLeague(
       }
     }
 
-    // Resolve away team
-    let awayTeamId = teamExtMap.get(event.idAwayTeam);
-    if (awayTeamId == null) {
+    let awayTeamId = event.idAwayTeam ? teamExtMap.get(event.idAwayTeam) : undefined;
+    if (awayTeamId == null && event.strAwayTeam) {
       awayTeamId = findTeamByName(event.strAwayTeam, allTeams);
-      if (awayTeamId != null) {
+      if (awayTeamId != null && event.idAwayTeam) {
         await db.insert(externalIds).values({
           entityType: 'team', entityId: awayTeamId,
           provider: PROVIDER, externalId: event.idAwayTeam,
@@ -166,26 +195,25 @@ async function syncLeague(
       ? parseInt(event.intHomeScore, 10) : null;
     const awayScore = event.intAwayScore != null && event.intAwayScore !== ''
       ? parseInt(event.intAwayScore, 10) : null;
-    const round     = event.strRound || (event.intRound ? `Round ${event.intRound}` : null);
+    const round     = eventNameAsLabel
+      ? event.strEvent
+      : (event.strRound || (event.intRound ? `Round ${event.intRound}` : null));
 
-    let existingId = fixtureExtMap.get(event.idEvent);
+    const existing   = fixtureExtMap.get(event.idEvent);
+    let   fixtureId  = existing?.id;
 
-    if (existingId != null) {
+    if (fixtureId != null) {
       const updated = await db
         .update(fixtures)
         .set({
-          status,
-          homeScore,
-          awayScore,
-          // Backfill team IDs that were null on the first sync pass
+          status, homeScore, awayScore,
           ...(homeTeamId != null && { homeTeamId }),
           ...(awayTeamId != null && { awayTeamId }),
         })
-        .where(eq(fixtures.id, existingId))
+        .where(eq(fixtures.id, fixtureId))
         .returning({ id: fixtures.id });
 
       if (updated.length === 0) {
-        // Stale mapping — fixture was deleted, clean up and re-insert
         await db.delete(externalIds).where(
           and(
             eq(externalIds.entityType, 'fixture'),
@@ -193,18 +221,18 @@ async function syncLeague(
             eq(externalIds.externalId, event.idEvent),
           )
         );
-        existingId = undefined;
+        fixtureId = undefined;
       }
     }
 
-    if (existingId == null) {
+    if (fixtureId == null) {
       const [inserted] = await db
         .insert(fixtures)
         .values({
           seasonId:    season.id,
           homeTeamId:  homeTeamId ?? null,
           awayTeamId:  awayTeamId ?? null,
-          scheduledAt: new Date(event.strTimestamp + 'Z'), // strTimestamp is UTC, no Z suffix
+          scheduledAt: new Date(event.strTimestamp + 'Z'),
           status,
           round,
           homeScore,
@@ -212,12 +240,35 @@ async function syncLeague(
         })
         .returning({ id: fixtures.id });
 
+      fixtureId = inserted.id;
       await db.insert(externalIds).values({
-        entityType: 'fixture', entityId: inserted.id,
+        entityType: 'fixture', entityId: fixtureId,
         provider: PROVIDER, externalId: event.idEvent,
       }).onConflictDoNothing();
+      fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: null });
+    }
 
-      fixtureExtMap.set(event.idEvent, inserted.id);
+    // Fetch podium for finished motorsport events — once only (skip if already stored)
+    if (fetchResults && status === 'finished' && fixtureId != null) {
+      const hasPodium = Array.isArray(fixtureExtMap.get(event.idEvent)?.sportMeta?.podium);
+      if (!hasPodium) {
+        try {
+          const results = await fetchEventResults(event.idEvent);
+          const podium  = results
+            .sort((a, b) => parseInt(a.intPosition) - parseInt(b.intPosition))
+            .slice(0, 3)
+            .map(r => r.strPlayer);
+
+          if (podium.length > 0) {
+            await db.update(fixtures)
+              .set({ sportMeta: { podium } })
+              .where(eq(fixtures.id, fixtureId));
+            fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: { podium } });
+          }
+        } catch (err) {
+          console.warn(`[sync:${leagueSlug}] Results fetch failed for ${event.idEvent}:`, err);
+        }
+      }
     }
 
     upserted++;
@@ -233,8 +284,8 @@ export async function syncFixtures(): Promise<{ upserted: number }> {
   let totalUpserted = 0;
 
   try {
-    for (const { apiId, season, slug, maxGameDurationHours } of LEAGUES_TO_SYNC) {
-      const count = await syncLeague(apiId, season, slug, maxGameDurationHours);
+    for (const config of LEAGUES_TO_SYNC) {
+      const count = await syncLeague(config);
       totalUpserted += count;
     }
 

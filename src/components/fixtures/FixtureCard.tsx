@@ -10,6 +10,8 @@ const LEAGUE_BANNER: Record<string, { strip: string; divider: string; text: stri
   'nrl':                 { strip: 'bg-gradient-to-r from-zinc-950 to-green-900',  divider: 'border-green-800/50',  text: 'text-white/85' },
   'super-rugby-pacific': { strip: 'bg-gradient-to-r from-blue-950 to-teal-900',   divider: 'border-teal-800/50',   text: 'text-white/85' },
   'fifa-world-cup':      { strip: 'bg-gradient-to-r from-zinc-950 to-amber-700',  divider: 'border-amber-700/50',  text: 'text-white/85' },
+  'formula-1':           { strip: 'bg-gradient-to-r from-zinc-950 to-red-900',    divider: 'border-red-800/50',    text: 'text-white/85' },
+  'v8-supercars':        { strip: 'bg-gradient-to-r from-zinc-950 to-orange-900', divider: 'border-orange-800/50', text: 'text-white/85' },
 };
 const DEFAULT_BANNER = { strip: 'bg-zinc-800/60', divider: 'border-zinc-800', text: 'text-zinc-400' };
 

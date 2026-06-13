@@ -277,6 +277,72 @@ async function main() {
   console.log(`✓ Teams: ${wcTeams.length} World Cup nations upserted`);
   console.log('  ↳ World Cup fixtures will be populated by the sync cron (npm run sync)');
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Motorsport — Formula 1 2026 + V8 Supercars 2026
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const [motorsport] = await db
+    .insert(sports)
+    .values({ name: 'Motorsport', slug: 'motorsport' })
+    .onConflictDoUpdate({ target: sports.slug, set: { name: 'Motorsport' } })
+    .returning();
+  console.log(`\n✓ Sport: ${motorsport.name} (id ${motorsport.id})`);
+
+  const [formulaOne] = await db
+    .insert(leagues)
+    .values({
+      sportId:   motorsport.id,
+      name:      'Formula 1',
+      shortName: 'F1',
+      slug:      'formula-1',
+      country:   'International',
+      logoUrl:   '/logos/formula-1.png',
+      isActive:  true,
+    })
+    .onConflictDoUpdate({
+      target: leagues.slug,
+      set: { name: 'Formula 1', shortName: 'F1', logoUrl: '/logos/formula-1.png' },
+    })
+    .returning();
+  console.log(`✓ League: ${formulaOne.name} (id ${formulaOne.id})`);
+
+  await db
+    .insert(seasons)
+    .values({ leagueId: formulaOne.id, year: '2026', isCurrent: true })
+    .onConflictDoUpdate({
+      target: [seasons.leagueId, seasons.year],
+      set: { isCurrent: true },
+    });
+  console.log(`✓ Season: F1 2026`);
+
+  const [v8Supercars] = await db
+    .insert(leagues)
+    .values({
+      sportId:   motorsport.id,
+      name:      'V8 Supercars',
+      shortName: 'V8',
+      slug:      'v8-supercars',
+      country:   'Australia',
+      logoUrl:   '/logos/v8-supercars.png',
+      isActive:  true,
+    })
+    .onConflictDoUpdate({
+      target: leagues.slug,
+      set: { name: 'V8 Supercars', shortName: 'V8', logoUrl: '/logos/v8-supercars.png' },
+    })
+    .returning();
+  console.log(`✓ League: ${v8Supercars.name} (id ${v8Supercars.id})`);
+
+  await db
+    .insert(seasons)
+    .values({ leagueId: v8Supercars.id, year: '2026', isCurrent: true })
+    .onConflictDoUpdate({
+      target: [seasons.leagueId, seasons.year],
+      set: { isCurrent: true },
+    });
+  console.log(`✓ Season: V8 Supercars 2026`);
+  console.log('  ↳ Motorsport fixtures will be populated by the sync cron (npm run sync)');
+
   console.log('\n✅ Seed complete.');
   process.exit(0);
 }
