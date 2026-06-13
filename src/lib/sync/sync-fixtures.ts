@@ -14,29 +14,25 @@ const LEAGUES_TO_SYNC = [
 
 // ── Status mapping ────────────────────────────────────────────────────────────
 
+// TheSportsDB in-progress status codes across all sports.
+const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'PEN', 'Break', 'Live', 'Q1', 'Q2', 'Q3', 'Q4']);
+
 function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatus {
-  if (event.strPostponed === 'yes') return 'postponed';
-  if (event.strStatus === 'FT')     return 'finished';
-  // TheSportsDB occasionally returns "NS" for completed games — trust scores
-  // over the status field when both are present.
-  if (event.intHomeScore != null && event.intAwayScore != null &&
-      event.intHomeScore !== '' && event.intAwayScore !== '') return 'finished';
+  if (event.strPostponed === 'yes')        return 'postponed';
+  if (event.strStatus === 'FT')            return 'finished';
+  if (LIVE_STATUSES.has(event.strStatus))  return 'live';
 
   const kickoff = new Date(event.strTimestamp + 'Z');
   const now = new Date();
 
-  // Kickoff hasn't happened yet
   if (kickoff >= now) return 'scheduled';
 
-  // Kickoff has passed — check how long ago
   const elapsed = now.getTime() - kickoff.getTime();
   if (elapsed > maxGameDurationHours * 60 * 60 * 1000) {
-    // Beyond the maximum game window: TheSportsDB data is stale.
-    // Mark finished so the game leaves the upcoming list.
+    // Beyond the maximum game window: TheSportsDB data is stale (status stuck at "NS").
     return 'finished';
   }
 
-  // Within the game window — genuinely in progress
   return 'live';
 }
 

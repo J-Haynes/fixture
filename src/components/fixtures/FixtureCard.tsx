@@ -136,7 +136,18 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
         </>
       );
     case 'live':
-      return <StatusBadge status="live" />;
+      return (
+        <>
+          {homeScore != null && awayScore != null && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xl font-bold text-white tabular-nums">{homeScore}</span>
+              <span className="text-zinc-600 text-lg">–</span>
+              <span className="text-2xl font-bold text-white tabular-nums">{awayScore}</span>
+            </div>
+          )}
+          <StatusBadge status="live" />
+        </>
+      );
     case 'postponed':
     case 'cancelled':
       return <StatusBadge status={status} />;
