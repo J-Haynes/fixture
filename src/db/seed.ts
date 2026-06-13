@@ -293,7 +293,6 @@ async function main() {
     .values({
       sportId:   motorsport.id,
       name:      'Formula 1',
-      shortName: 'F1',
       slug:      'formula-1',
       country:   'International',
       logoUrl:   '/logos/formula-1.png',
@@ -301,7 +300,7 @@ async function main() {
     })
     .onConflictDoUpdate({
       target: leagues.slug,
-      set: { name: 'Formula 1', shortName: 'F1', logoUrl: '/logos/formula-1.png' },
+      set: { name: 'Formula 1', shortName: null, logoUrl: '/logos/formula-1.png' },
     })
     .returning();
   console.log(`✓ League: ${formulaOne.name} (id ${formulaOne.id})`);
@@ -320,7 +319,6 @@ async function main() {
     .values({
       sportId:   motorsport.id,
       name:      'V8 Supercars',
-      shortName: 'V8',
       slug:      'v8-supercars',
       country:   'Australia',
       logoUrl:   '/logos/v8-supercars.png',
@@ -328,7 +326,7 @@ async function main() {
     })
     .onConflictDoUpdate({
       target: leagues.slug,
-      set: { name: 'V8 Supercars', shortName: 'V8', logoUrl: '/logos/v8-supercars.png' },
+      set: { name: 'V8 Supercars', shortName: null, logoUrl: '/logos/v8-supercars.png' },
     })
     .returning();
   console.log(`✓ League: ${v8Supercars.name} (id ${v8Supercars.id})`);

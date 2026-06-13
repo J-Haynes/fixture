@@ -9,7 +9,7 @@ import { formatKickoffTime } from '@/lib/dates';
 const LEAGUE_BANNER: Record<string, { strip: string; divider: string; text: string }> = {
   'nrl':                 { strip: 'bg-gradient-to-r from-zinc-950 to-green-900',  divider: 'border-green-800/50',  text: 'text-white/85' },
   'super-rugby-pacific': { strip: 'bg-gradient-to-r from-blue-950 to-teal-900',   divider: 'border-teal-800/50',   text: 'text-white/85' },
-  'fifa-world-cup':      { strip: 'bg-gradient-to-r from-zinc-950 to-amber-700',  divider: 'border-amber-700/50',  text: 'text-white/85' },
+  'fifa-world-cup':      { strip: 'bg-gradient-to-r from-zinc-950 to-yellow-500',  divider: 'border-amber-700/50',  text: 'text-white/85' },
   'formula-1':           { strip: 'bg-gradient-to-r from-zinc-950 to-red-900',    divider: 'border-red-800/50',    text: 'text-white/85' },
   'v8-supercars':        { strip: 'bg-gradient-to-r from-zinc-950 to-orange-900', divider: 'border-orange-800/50', text: 'text-white/85' },
 };
@@ -63,7 +63,7 @@ export function FixtureCard({ fixture }: Props) {
             awayScore={awayScore}
           />
         ) : (
-          <EventLayout round={round} status={status} sportMeta={sportMeta} />
+          <EventLayout league={league} round={round} scheduledAt={scheduledAt} status={status} sportMeta={sportMeta} />
         )}
       </div>
     </article>
@@ -163,32 +163,51 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
   }
 }
 
-// ── Non-team event layout (future: golf, F1, etc.) ───────────────────────────
+// ── Non-team event layout (motorsport, etc.) ────────────────────────────────
 
 interface EventLayoutProps {
-  round?: string;
+  league: { logoUrl?: string | null; name: string };
+  round?: string | null;
+  scheduledAt: string;
   status: Fixture['status'];
   sportMeta?: Record<string, unknown>;
 }
 
-function EventLayout({ round, status, sportMeta }: EventLayoutProps) {
-  const podium = Array.isArray(sportMeta?.podium) ? (sportMeta.podium as string[]) : undefined;
+const PODIUM_TEXT = ['text-zinc-400', 'text-zinc-500', 'text-zinc-500'] as const;
+
+function EventLayout({ league, round, scheduledAt, status, sportMeta }: EventLayoutProps) {
+  const podium    = Array.isArray(sportMeta?.podium) ? (sportMeta.podium as string[]) : undefined;
+  const eventName = typeof sportMeta?.eventName === 'string' ? sportMeta.eventName : undefined;
+  // Session type ("Qualifying", "Race") is already shown in the banner strip — body shows race name only
+  const title = eventName ?? round;
 
   return (
-    <div className="text-center py-1 space-y-2">
-      {round && <p className="font-semibold text-zinc-100">{round}</p>}
-      {status === 'finished' && podium && (
-        <ol className="space-y-0.5">
-          {podium.slice(0, 3).map((name, i) => (
-            <li key={i} className="text-sm text-zinc-400">
-              <span className="font-medium text-zinc-300">{i + 1}.</span> {name}
+    <div className="flex flex-col items-center gap-3 text-center">
+      {league.logoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={league.logoUrl} alt={league.name} className="h-12 w-auto" />
+      )}
+      {title && (
+        <p className="font-semibold text-zinc-100 leading-snug">{title}</p>
+      )}
+      {status === 'finished' && podium && podium.length > 0 ? (
+        <ol className="w-full space-y-1">
+          {podium.map((name, i) => (
+            <li key={i} className="flex items-baseline justify-center gap-1.5 text-sm">
+              <span className="tabular-nums text-zinc-600 w-4 text-right shrink-0">{i + 1}.</span>
+              <span className={PODIUM_TEXT[i]}>{name}</span>
             </li>
           ))}
         </ol>
-      )}
-      <div className="flex justify-center">
+      ) : status === 'live' ? (
+        <StatusBadge status="live" />
+      ) : status === 'scheduled' ? (
+        <span className="text-sm font-medium text-zinc-500 tabular-nums" suppressHydrationWarning>
+          {formatKickoffTime(scheduledAt)}
+        </span>
+      ) : (status === 'postponed' || status === 'cancelled') ? (
         <StatusBadge status={status} />
-      </div>
+      ) : null}
     </div>
   );
 }

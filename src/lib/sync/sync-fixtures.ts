@@ -195,20 +195,32 @@ async function syncLeague(config: LeagueConfig): Promise<number> {
       ? parseInt(event.intHomeScore, 10) : null;
     const awayScore = event.intAwayScore != null && event.intAwayScore !== ''
       ? parseInt(event.intAwayScore, 10) : null;
-    const round     = eventNameAsLabel
-      ? event.strEvent
+
+    // For motorsport: round = session type ("Qualifying", "Race", "Sprint")
+    //                 strEvent = the event name ("Spanish Grand Prix") → goes in sportMeta.eventName
+    // For team sports: round = named round or "Round N"
+    const round = eventNameAsLabel
+      ? (event.strRound ?? null)
       : (event.strRound || (event.intRound ? `Round ${event.intRound}` : null));
 
-    const existing   = fixtureExtMap.get(event.idEvent);
-    let   fixtureId  = existing?.id;
+    const existing  = fixtureExtMap.get(event.idEvent);
+    let   fixtureId = existing?.id;
+    // Track sportMeta locally so podium merge is always accurate
+    let   currentSportMeta: Record<string, unknown> | null = existing?.sportMeta ?? null;
 
     if (fixtureId != null) {
+      // For motorsport, also persist the event name into sportMeta and update round
+      const metaUpdate = eventNameAsLabel
+        ? { ...(currentSportMeta ?? {}), eventName: event.strEvent }
+        : undefined;
+
       const updated = await db
         .update(fixtures)
         .set({
           status, homeScore, awayScore,
           ...(homeTeamId != null && { homeTeamId }),
           ...(awayTeamId != null && { awayTeamId }),
+          ...(metaUpdate != null && { round, sportMeta: metaUpdate }),
         })
         .where(eq(fixtures.id, fixtureId))
         .returning({ id: fixtures.id });
@@ -221,11 +233,16 @@ async function syncLeague(config: LeagueConfig): Promise<number> {
             eq(externalIds.externalId, event.idEvent),
           )
         );
-        fixtureId = undefined;
+        fixtureId       = undefined;
+        currentSportMeta = null;
+      } else if (metaUpdate != null) {
+        currentSportMeta = metaUpdate;
       }
     }
 
     if (fixtureId == null) {
+      const initMeta = eventNameAsLabel ? { eventName: event.strEvent } : null;
+
       const [inserted] = await db
         .insert(fixtures)
         .values({
@@ -237,20 +254,23 @@ async function syncLeague(config: LeagueConfig): Promise<number> {
           round,
           homeScore,
           awayScore,
+          ...(initMeta != null && { sportMeta: initMeta }),
         })
         .returning({ id: fixtures.id });
 
-      fixtureId = inserted.id;
+      fixtureId       = inserted.id;
+      currentSportMeta = initMeta;
+
       await db.insert(externalIds).values({
         entityType: 'fixture', entityId: fixtureId,
         provider: PROVIDER, externalId: event.idEvent,
       }).onConflictDoNothing();
-      fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: null });
+      fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: initMeta });
     }
 
     // Fetch podium for finished motorsport events — once only (skip if already stored)
     if (fetchResults && status === 'finished' && fixtureId != null) {
-      const hasPodium = Array.isArray(fixtureExtMap.get(event.idEvent)?.sportMeta?.podium);
+      const hasPodium = Array.isArray(currentSportMeta?.podium);
       if (!hasPodium) {
         try {
           const results = await fetchEventResults(event.idEvent);
@@ -260,10 +280,12 @@ async function syncLeague(config: LeagueConfig): Promise<number> {
             .map(r => r.strPlayer);
 
           if (podium.length > 0) {
+            const newMeta = { ...(currentSportMeta ?? {}), podium };
             await db.update(fixtures)
-              .set({ sportMeta: { podium } })
+              .set({ sportMeta: newMeta })
               .where(eq(fixtures.id, fixtureId));
-            fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: { podium } });
+            fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: newMeta });
+            currentSportMeta = newMeta;
           }
         } catch (err) {
           console.warn(`[sync:${leagueSlug}] Results fetch failed for ${event.idEvent}:`, err);
