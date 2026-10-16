@@ -12,4 +12,4 @@ export const seasons = pgTable('seasons', {
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
 }, table => ({
   uniqLeagueYear: unique('seasons_league_year_key').on(table.leagueId, table.year),
-}));
+})).enableRLS();

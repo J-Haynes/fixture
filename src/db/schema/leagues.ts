@@ -10,4 +10,4 @@ export const leagues = pgTable('leagues', {
   country:   text('country'),
   logoUrl:   text('logo_url'),
   isActive:  boolean('is_active').default(true),
-});
+}).enableRLS();

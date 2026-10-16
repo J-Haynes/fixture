@@ -18,4 +18,4 @@ export const fixtures = pgTable('fixtures', {
   // Serves both the page's date-range query and the sync's per-season activity check
   seasonScheduledIdx: index('fixtures_season_scheduled_idx').on(table.seasonId, table.scheduledAt),
   scheduledIdx:       index('fixtures_scheduled_idx').on(table.scheduledAt),
-}));
+})).enableRLS();

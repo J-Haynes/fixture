@@ -27,7 +27,7 @@ The season that gets synced comes from the DB (`seasons.is_current` + `leagues.i
 
 ## Tech stack
 
-- **Next.js 16.2 (App Router)**, React 19.2, TypeScript (strict). Next 16 differs from older versions; see AGENTS.md.
+- **Next.js 16.3 (App Router)**, React 19.2, TypeScript (strict). Next 16 differs from older versions; see AGENTS.md.
   The bundled docs at `node_modules/next/dist/docs/` only exist after `npm install`.
 - **Tailwind CSS v4** via `@tailwindcss/postcss` (no `tailwind.config`; styles in [src/app/globals.css](src/app/globals.css)).
   Dark zinc palette, emerald accent.
@@ -148,6 +148,11 @@ and set the old one to `false`. No code change is needed.
   two unique keys, `(entity_type, entity_id, provider)` and `(provider, entity_type, external_id)`; the sync's upsert
   targets the second.
 - `sync_log`: rows only for runs that changed data or errored, kept for 30 days
+
+**Row-level security is on for every table, with no policies.** The app connects as `postgres`, which has
+`BYPASSRLS`, so it is unaffected; the Supabase Data API (`anon`/`authenticated` roles) is locked out. Every new
+table must end in `.enableRLS()`. Never use the anon key or the Data API from the app without adding policies first.
+[supabase/enable-rls.sql](supabase/enable-rls.sql) applies the same thing from the SQL editor.
 
 Schema changes go through `npm run db:push`. There is no `drizzle/` migrations folder in git. **Push the schema before
 deploying code that depends on it.** The sync queries `seasons.last_synced_at`, for example.
