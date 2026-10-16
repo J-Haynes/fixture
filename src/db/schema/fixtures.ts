@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, timestamp, text, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, timestamp, text, jsonb, index } from 'drizzle-orm/pg-core';
 import { seasons } from './seasons';
 import { teams } from './teams';
 
@@ -14,4 +14,8 @@ export const fixtures = pgTable('fixtures', {
   homeScore:   integer('home_score'),
   awayScore:   integer('away_score'),
   sportMeta:   jsonb('sport_meta').$type<Record<string, unknown>>(), // sport-specific overflow
-});
+}, table => ({
+  // Serves both the page's date-range query and the sync's per-season activity check
+  seasonScheduledIdx: index('fixtures_season_scheduled_idx').on(table.seasonId, table.scheduledAt),
+  scheduledIdx:       index('fixtures_scheduled_idx').on(table.scheduledAt),
+}));
