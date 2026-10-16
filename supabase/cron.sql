@@ -10,8 +10,8 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- 1. Extensions (also toggleable under Database → Extensions)
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
+create extension if not exists pg_cron with schema pg_catalog;
+create extension if not exists pg_net with schema extensions;
 
 -- 2. Secrets — run ONCE, by hand, with real values (don't commit them):
 --
