@@ -12,5 +12,6 @@ if (!process.env.DATABASE_URL) {
 
 // `prepare: false` is required for Supabase's PgBouncer / transaction pooler.
 // It's a no-op on direct connections, so this config works for both.
-const client = postgres(process.env.DATABASE_URL, { prepare: false });
+// One connection per serverless instance (queries are sequential anyway), released when idle.
+const client = postgres(process.env.DATABASE_URL, { prepare: false, max: 1, idle_timeout: 20 });
 export const db = drizzle(client, { schema });

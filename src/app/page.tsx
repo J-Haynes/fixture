@@ -1,7 +1,8 @@
-// Fixture data changes constantly — always render fresh on every request
-export const dynamic = 'force-dynamic';
+// Statically rendered and cached (ISR). /api/cron/sync expires the fixtures cache tag
+// whenever data changes; the hourly revalidate rolls the ±14-day window forward.
+export const revalidate = 3600;
 
-import { getFixtures } from '@/lib/fixtures';
+import { getCachedFixtures } from '@/lib/fixtures';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { FixtureFeed } from '@/components/fixtures/FixtureFeed';
 
@@ -18,21 +19,13 @@ export default async function HomePage() {
   const to = new Date(today);
   to.setDate(to.getDate() + 14); // show next 2 rounds of fixtures
 
-  const { fixtures: allFixtures } = await getFixtures({ from: isoDate(from), to: isoDate(to) });
-
-  // Strip stale "scheduled" games server-side so the fixture list is stable
-  // across SSR and client hydration. Any scheduled game that kicked off more
-  // than 10 minutes ago should have been marked "live" by the last sync run.
-  const syncCutoff = new Date(Date.now() - 10 * 60 * 1000);
-  const fixtures = allFixtures.filter(
-    f => f.status !== 'scheduled' || new Date(f.scheduledAt) >= syncCutoff
-  );
+  const { fixtures } = await getCachedFixtures({ from: isoDate(from), to: isoDate(to) });
 
   return (
     <>
       <AppHeader />
       <main>
-        <FixtureFeed fixtures={fixtures} />
+        <FixtureFeed fixtures={fixtures} renderedAt={today.getTime()} />
       </main>
     </>
   );

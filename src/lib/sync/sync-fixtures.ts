@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, lt, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { fixtures, teams, seasons, leagues, externalIds, syncLog } from '@/db/schema';
 import { fetchSeasonEvents, fetchEventResults, type TsdbEvent } from './thesportsdb';
@@ -8,8 +8,6 @@ const PROVIDER = 'thesportsdb';
 
 interface LeagueConfig {
   apiId:                string;
-  season:               string;
-  slug:                 string;
   maxGameDurationHours: number;
   /** Call eventresults.php for finished events to populate sportMeta.podium */
   fetchResults?:        boolean;
@@ -19,25 +17,102 @@ interface LeagueConfig {
   sessionFilter?:       (event: TsdbEvent) => boolean;
 }
 
-const LEAGUES_TO_SYNC: LeagueConfig[] = [
-  { apiId: '4551', season: '2026', slug: 'super-rugby-pacific', maxGameDurationHours: 3 },
-  { apiId: '4416', season: '2026', slug: 'nrl',                 maxGameDurationHours: 3 },
-  { apiId: '4429', season: '2026', slug: 'fifa-world-cup',      maxGameDurationHours: 3 },
-  {
-    apiId: '4370', season: '2026', slug: 'formula-1',
+// Provider config, keyed by league slug. Which season gets synced comes from the DB
+// (seasons.is_current + leagues.is_active), so no code change is needed between seasons.
+const LEAGUE_CONFIG: Record<string, LeagueConfig> = {
+  'super-rugby-pacific': { apiId: '4551', maxGameDurationHours: 3 },
+  'nrl':                 { apiId: '4416', maxGameDurationHours: 3 },
+  'fifa-world-cup':      { apiId: '4429', maxGameDurationHours: 3 },
+  'formula-1': {
+    apiId: '4370',
     maxGameDurationHours: 4,
     fetchResults:     true,
     eventNameAsLabel: true,
     // Skip practice sessions and testing days; keep races, sprints, qualifying
     sessionFilter: e => !/(Practice|Testing|Sprint Qualifying)/i.test(e.strEvent),
   },
-  {
-    apiId: '4489', season: '2026', slug: 'v8-supercars',
+  'v8-supercars': {
+    apiId: '4489',
     maxGameDurationHours: 2,
     fetchResults:     true,
     eventNameAsLabel: true,
   },
-];
+};
+
+// ── Sync cadence ──────────────────────────────────────────────────────────────
+// The cron fires every 2 minutes, but a league is only fetched from the provider
+// when it's due. Quiet runs cost one DB query and no API calls.
+
+const MINUTE = 60 * 1000;
+const HOUR   = 60 * MINUTE;
+
+const CADENCE = {
+  live:      0,            // fixture in play, or kicking off within 15 min — every run
+  matchday:  15 * MINUTE,  // fixture kicked off in the last 12h or kicks off within 3h
+  inSeason:  6 * HOUR,     // fixtures still to play — picks up reschedules
+  offSeason: 24 * HOUR,    // every fixture finished
+};
+
+/** Keep polling past maxGameDurationHours so late final scores still land */
+const LIVE_GRACE_MS = 30 * MINUTE;
+/** Cron runs aren't exactly on the minute; don't miss a slot by a few seconds */
+const CADENCE_TOLERANCE_MS = MINUTE;
+
+const PODIUM_RETRY_MS   = 30 * MINUTE;
+const PODIUM_GIVE_UP_MS = 3 * 24 * HOUR;
+
+const SYNC_LOG_RETENTION_MS = 30 * 24 * HOUR;
+
+interface SeasonActivity {
+  seasonId:            number;
+  year:                string;
+  lastSyncedAt:        Date | null;
+  slug:                string;
+  total:               number;
+  open:                number;
+  matchday:            number;
+  latestOpenKickoffMs: number | null;
+}
+
+async function loadSeasonActivity(): Promise<SeasonActivity[]> {
+  return db
+    .select({
+      seasonId:     seasons.id,
+      year:         seasons.year,
+      lastSyncedAt: seasons.lastSyncedAt,
+      slug:         leagues.slug,
+      total: sql<number>`count(${fixtures.id})`.mapWith(Number),
+      open:  sql<number>`count(${fixtures.id}) filter (
+        where ${fixtures.status} in ('scheduled', 'live', 'postponed'))`.mapWith(Number),
+      matchday: sql<number>`count(${fixtures.id}) filter (
+        where ${fixtures.scheduledAt} between now() - interval '12 hours' and now() + interval '3 hours')`.mapWith(Number),
+      // Most recent kickoff of a not-yet-finished fixture, including ones starting within 15 min
+      latestOpenKickoffMs: sql<number | null>`extract(epoch from max(${fixtures.scheduledAt}) filter (
+        where ${fixtures.status} in ('scheduled', 'live')
+          and ${fixtures.scheduledAt} <= now() + interval '15 minutes')) * 1000`.mapWith(Number),
+    })
+    .from(seasons)
+    .innerJoin(leagues, eq(seasons.leagueId, leagues.id))
+    .leftJoin(fixtures, eq(fixtures.seasonId, seasons.id))
+    .where(and(eq(seasons.isCurrent, true), eq(leagues.isActive, true)))
+    .groupBy(seasons.id, leagues.id);
+}
+
+function syncInterval(activity: SeasonActivity, config: LeagueConfig, now: number): number {
+  const liveWindowMs = config.maxGameDurationHours * HOUR + LIVE_GRACE_MS;
+  if (activity.latestOpenKickoffMs != null && activity.latestOpenKickoffMs >= now - liveWindowMs) {
+    return CADENCE.live;
+  }
+  if (activity.matchday > 0)                       return CADENCE.matchday;
+  if (activity.open > 0 || activity.total === 0)   return CADENCE.inSeason;
+  return CADENCE.offSeason;
+}
+
+function isDue(activity: SeasonActivity, config: LeagueConfig, now: number): boolean {
+  if (!activity.lastSyncedAt) return true;
+  const elapsed = now - activity.lastSyncedAt.getTime();
+  return elapsed >= syncInterval(activity, config, now) - CADENCE_TOLERANCE_MS;
+}
 
 // ── Status mapping ────────────────────────────────────────────────────────────
 
@@ -96,45 +171,14 @@ function findTeamByName(
   return undefined;
 }
 
-// ── Per-league sync ───────────────────────────────────────────────────────────
+// ── Shared lookups (loaded once per run) ──────────────────────────────────────
 
-type FixtureEntry = { id: number; sportMeta: Record<string, unknown> | null };
+interface SyncContext {
+  allTeams:   { id: number; name: string }[];
+  teamExtMap: Map<string, number>;
+}
 
-async function syncLeague(config: LeagueConfig): Promise<number> {
-  const {
-    apiId, season: seasonYear, slug: leagueSlug,
-    maxGameDurationHours, fetchResults, eventNameAsLabel, sessionFilter,
-  } = config;
-
-  // 1. Resolve league + season
-  const [league] = await db
-    .select()
-    .from(leagues)
-    .where(eq(leagues.slug, leagueSlug))
-    .limit(1);
-
-  if (!league) {
-    console.warn(`[sync:${leagueSlug}] League not found — run db:seed first`);
-    return 0;
-  }
-
-  const [season] = await db
-    .select()
-    .from(seasons)
-    .where(and(eq(seasons.leagueId, league.id), eq(seasons.year, seasonYear)))
-    .limit(1);
-
-  if (!season) {
-    console.warn(`[sync:${leagueSlug}] Season ${seasonYear} not found — run db:seed first`);
-    return 0;
-  }
-
-  // 2. Fetch + filter events
-  let events = await fetchSeasonEvents(apiId, seasonYear);
-  if (sessionFilter) events = events.filter(sessionFilter);
-  console.log(`[sync:${leagueSlug}] ${events.length} events from API`);
-
-  // 3. Load teams + external ID mappings
+async function loadContext(): Promise<SyncContext> {
   const allTeams = await db.select({ id: teams.id, name: teams.name }).from(teams);
 
   const teamMappings = await db
@@ -142,58 +186,115 @@ async function syncLeague(config: LeagueConfig): Promise<number> {
     .from(externalIds)
     .where(and(eq(externalIds.entityType, 'team'), eq(externalIds.provider, PROVIDER)));
 
-  // Join fixtures so we can check whether sportMeta.podium already exists
-  const fixtureMappingRows = await db
+  return { allTeams, teamExtMap: new Map(teamMappings.map(m => [m.externalId, m.entityId])) };
+}
+
+async function resolveTeam(
+  externalId: string | null,
+  name:       string | null,
+  ctx:        SyncContext,
+): Promise<number | undefined> {
+  const mapped = externalId ? ctx.teamExtMap.get(externalId) : undefined;
+  if (mapped != null || !name) return mapped;
+
+  const teamId = findTeamByName(name, ctx.allTeams);
+  if (teamId != null && externalId) {
+    await db.insert(externalIds).values({
+      entityType: 'team', entityId: teamId,
+      provider: PROVIDER, externalId,
+    }).onConflictDoNothing();
+    ctx.teamExtMap.set(externalId, teamId);
+  }
+  return teamId;
+}
+
+// ── Motorsport podium ─────────────────────────────────────────────────────────
+
+type SportMeta = Record<string, unknown>;
+
+/** Podiums are fetched once; empty results are retried every 30 min for 3 days, then given up on */
+function podiumDue(meta: SportMeta | null, scheduledAt: Date, now: number): boolean {
+  if (Array.isArray(meta?.podium))                         return false;
+  if (now - scheduledAt.getTime() > PODIUM_GIVE_UP_MS)     return false;
+  const checkedAt = typeof meta?.podiumCheckedAt === 'string' ? Date.parse(meta.podiumCheckedAt) : NaN;
+  return Number.isNaN(checkedAt) || now - checkedAt >= PODIUM_RETRY_MS;
+}
+
+/** Returns true if a podium was stored (a user-visible change) */
+async function syncPodium(
+  eventId:    string,
+  fixtureId:  number,
+  meta:       SportMeta | null,
+  leagueSlug: string,
+): Promise<boolean> {
+  let podium: string[] = [];
+  try {
+    const results = await fetchEventResults(eventId);
+    podium = results
+      .sort((a, b) => parseInt(a.intPosition) - parseInt(b.intPosition))
+      .slice(0, 3)
+      .map(r => r.strPlayer);
+  } catch (err) {
+    console.warn(`[sync:${leagueSlug}] Results fetch failed for ${eventId}:`, err);
+  }
+
+  const newMeta = podium.length > 0
+    ? { ...(meta ?? {}), podium }
+    : { ...(meta ?? {}), podiumCheckedAt: new Date().toISOString() };
+
+  await db.update(fixtures).set({ sportMeta: newMeta }).where(eq(fixtures.id, fixtureId));
+  return podium.length > 0;
+}
+
+// ── Per-league sync ───────────────────────────────────────────────────────────
+
+async function syncLeague(
+  season: SeasonActivity,
+  config: LeagueConfig,
+  ctx:    SyncContext,
+): Promise<{ processed: number; changed: number }> {
+  const { seasonId, year, slug: leagueSlug } = season;
+  const { apiId, maxGameDurationHours, fetchResults, eventNameAsLabel, sessionFilter } = config;
+  const now = Date.now();
+
+  let events = await fetchSeasonEvents(apiId, year);
+  if (sessionFilter) events = events.filter(sessionFilter);
+
+  // Current DB state for this season, keyed by provider event ID, so unchanged rows can be skipped
+  const existingRows = await db
     .select({
-      externalId: externalIds.externalId,
-      entityId:   externalIds.entityId,
-      sportMeta:  fixtures.sportMeta,
+      externalId:  externalIds.externalId,
+      id:          fixtures.id,
+      status:      fixtures.status,
+      homeScore:   fixtures.homeScore,
+      awayScore:   fixtures.awayScore,
+      scheduledAt: fixtures.scheduledAt,
+      round:       fixtures.round,
+      homeTeamId:  fixtures.homeTeamId,
+      awayTeamId:  fixtures.awayTeamId,
+      sportMeta:   fixtures.sportMeta,
     })
     .from(externalIds)
-    .leftJoin(fixtures, eq(fixtures.id, externalIds.entityId))
-    .where(and(eq(externalIds.entityType, 'fixture'), eq(externalIds.provider, PROVIDER)));
+    .innerJoin(fixtures, eq(fixtures.id, externalIds.entityId))
+    .where(and(
+      eq(externalIds.entityType, 'fixture'),
+      eq(externalIds.provider, PROVIDER),
+      eq(fixtures.seasonId, seasonId),
+    ));
+  const existingByExtId = new Map(existingRows.map(r => [r.externalId, r]));
 
-  const teamExtMap    = new Map(teamMappings.map(m => [m.externalId, m.entityId]));
-  const fixtureExtMap = new Map<string, FixtureEntry>(
-    fixtureMappingRows.map(m => [
-      m.externalId,
-      { id: m.entityId, sportMeta: m.sportMeta as Record<string, unknown> | null },
-    ])
-  );
-
-  // 4. Process each event
-  let upserted = 0;
+  let changed = 0;
 
   for (const event of events) {
     // Resolve teams (null for motorsport events)
-    let homeTeamId = event.idHomeTeam ? teamExtMap.get(event.idHomeTeam) : undefined;
-    if (homeTeamId == null && event.strHomeTeam) {
-      homeTeamId = findTeamByName(event.strHomeTeam, allTeams);
-      if (homeTeamId != null && event.idHomeTeam) {
-        await db.insert(externalIds).values({
-          entityType: 'team', entityId: homeTeamId,
-          provider: PROVIDER, externalId: event.idHomeTeam,
-        }).onConflictDoNothing();
-        teamExtMap.set(event.idHomeTeam, homeTeamId);
-      }
-    }
+    const homeTeamId = await resolveTeam(event.idHomeTeam, event.strHomeTeam, ctx);
+    const awayTeamId = await resolveTeam(event.idAwayTeam, event.strAwayTeam, ctx);
 
-    let awayTeamId = event.idAwayTeam ? teamExtMap.get(event.idAwayTeam) : undefined;
-    if (awayTeamId == null && event.strAwayTeam) {
-      awayTeamId = findTeamByName(event.strAwayTeam, allTeams);
-      if (awayTeamId != null && event.idAwayTeam) {
-        await db.insert(externalIds).values({
-          entityType: 'team', entityId: awayTeamId,
-          provider: PROVIDER, externalId: event.idAwayTeam,
-        }).onConflictDoNothing();
-        teamExtMap.set(event.idAwayTeam, awayTeamId);
-      }
-    }
-
-    const status    = mapStatus(event, maxGameDurationHours);
-    const homeScore = event.intHomeScore != null && event.intHomeScore !== ''
+    const status      = mapStatus(event, maxGameDurationHours);
+    const scheduledAt = new Date(event.strTimestamp + 'Z');
+    const homeScore   = event.intHomeScore != null && event.intHomeScore !== ''
       ? parseInt(event.intHomeScore, 10) : null;
-    const awayScore = event.intAwayScore != null && event.intAwayScore !== ''
+    const awayScore   = event.intAwayScore != null && event.intAwayScore !== ''
       ? parseInt(event.intAwayScore, 10) : null;
 
     // For motorsport: round = session type ("Qualifying", "Race", "Sprint")
@@ -203,132 +304,149 @@ async function syncLeague(config: LeagueConfig): Promise<number> {
       ? (event.strRound ?? null)
       : (event.strRound || (event.intRound ? `Round ${event.intRound}` : null));
 
-    const existing  = fixtureExtMap.get(event.idEvent);
-    let   fixtureId = existing?.id;
-    // Track sportMeta locally so podium merge is always accurate
-    let   currentSportMeta: Record<string, unknown> | null = existing?.sportMeta ?? null;
+    const existing = existingByExtId.get(event.idEvent);
+    let fixtureId: number;
+    let sportMeta: SportMeta | null;
 
-    if (fixtureId != null) {
-      // For motorsport, also persist the event name into sportMeta and update round
-      const metaUpdate = eventNameAsLabel
-        ? { ...(currentSportMeta ?? {}), eventName: event.strEvent }
-        : undefined;
+    if (existing) {
+      fixtureId = existing.id;
+      sportMeta = existing.sportMeta ?? null;
 
-      const updated = await db
-        .update(fixtures)
-        .set({
-          status, homeScore, awayScore,
-          scheduledAt: new Date(event.strTimestamp + 'Z'),
-          ...(homeTeamId != null && { homeTeamId }),
-          ...(awayTeamId != null && { awayTeamId }),
-          ...(metaUpdate != null && { round, sportMeta: metaUpdate }),
-        })
-        .where(eq(fixtures.id, fixtureId))
-        .returning({ id: fixtures.id });
-
-      if (updated.length === 0) {
-        await db.delete(externalIds).where(
-          and(
-            eq(externalIds.entityType, 'fixture'),
-            eq(externalIds.provider, PROVIDER),
-            eq(externalIds.externalId, event.idEvent),
-          )
-        );
-        fixtureId       = undefined;
-        currentSportMeta = null;
-      } else if (metaUpdate != null) {
-        currentSportMeta = metaUpdate;
+      // Only write columns that actually changed — most runs touch no rows at all
+      const patch: Partial<typeof fixtures.$inferInsert> = {};
+      if (existing.status    !== status)    patch.status    = status;
+      if (existing.homeScore !== homeScore) patch.homeScore = homeScore;
+      if (existing.awayScore !== awayScore) patch.awayScore = awayScore;
+      if (existing.scheduledAt.getTime() !== scheduledAt.getTime()) patch.scheduledAt = scheduledAt;
+      if (homeTeamId != null && existing.homeTeamId !== homeTeamId) patch.homeTeamId = homeTeamId;
+      if (awayTeamId != null && existing.awayTeamId !== awayTeamId) patch.awayTeamId = awayTeamId;
+      // For motorsport, also keep the round and event name in sync
+      if (eventNameAsLabel) {
+        if (existing.round !== round) patch.round = round;
+        if (sportMeta?.eventName !== event.strEvent) {
+          sportMeta = { ...(sportMeta ?? {}), eventName: event.strEvent };
+          patch.sportMeta = sportMeta;
+        }
       }
-    }
 
-    if (fixtureId == null) {
-      const initMeta = eventNameAsLabel ? { eventName: event.strEvent } : null;
+      if (Object.keys(patch).length > 0) {
+        await db.update(fixtures).set(patch).where(eq(fixtures.id, fixtureId));
+        changed++;
+      }
+    } else {
+      sportMeta = eventNameAsLabel ? { eventName: event.strEvent } : null;
 
       const [inserted] = await db
         .insert(fixtures)
         .values({
-          seasonId:    season.id,
+          seasonId,
           homeTeamId:  homeTeamId ?? null,
           awayTeamId:  awayTeamId ?? null,
-          scheduledAt: new Date(event.strTimestamp + 'Z'),
+          scheduledAt,
           status,
           round,
           homeScore,
           awayScore,
-          ...(initMeta != null && { sportMeta: initMeta }),
+          ...(sportMeta != null && { sportMeta }),
         })
         .returning({ id: fixtures.id });
+      fixtureId = inserted.id;
 
-      fixtureId       = inserted.id;
-      currentSportMeta = initMeta;
-
+      // Re-points a stale mapping whose fixture row was deleted
       await db.insert(externalIds).values({
         entityType: 'fixture', entityId: fixtureId,
         provider: PROVIDER, externalId: event.idEvent,
-      }).onConflictDoNothing();
-      fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: initMeta });
+      }).onConflictDoUpdate({
+        target: [externalIds.provider, externalIds.entityType, externalIds.externalId],
+        set:    { entityId: fixtureId },
+      });
+      changed++;
     }
 
-    // Fetch podium for finished motorsport events — once only (skip if already stored)
-    if (fetchResults && status === 'finished' && fixtureId != null) {
-      const hasPodium = Array.isArray(currentSportMeta?.podium);
-      if (!hasPodium) {
-        try {
-          const results = await fetchEventResults(event.idEvent);
-          const podium  = results
-            .sort((a, b) => parseInt(a.intPosition) - parseInt(b.intPosition))
-            .slice(0, 3)
-            .map(r => r.strPlayer);
-
-          if (podium.length > 0) {
-            const newMeta = { ...(currentSportMeta ?? {}), podium };
-            await db.update(fixtures)
-              .set({ sportMeta: newMeta })
-              .where(eq(fixtures.id, fixtureId));
-            fixtureExtMap.set(event.idEvent, { id: fixtureId, sportMeta: newMeta });
-            currentSportMeta = newMeta;
-          }
-        } catch (err) {
-          console.warn(`[sync:${leagueSlug}] Results fetch failed for ${event.idEvent}:`, err);
-        }
-      }
+    if (fetchResults && status === 'finished' && podiumDue(sportMeta, scheduledAt, now)) {
+      if (await syncPodium(event.idEvent, fixtureId, sportMeta, leagueSlug)) changed++;
     }
-
-    upserted++;
   }
 
-  return upserted;
+  return { processed: events.length, changed };
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
-export async function syncFixtures(): Promise<{ upserted: number }> {
+export interface SyncResult {
+  /** League slugs fetched from the provider this run */
+  synced:    string[];
+  /** Current seasons that weren't due */
+  skipped:   number;
+  /** Provider events examined */
+  processed: number;
+  /** Fixtures inserted or updated (drives cache revalidation) */
+  changed:   number;
+  errors:    string[];
+}
+
+async function writeSyncLog(entry: Pick<typeof syncLog.$inferInsert, 'status' | 'recordsUpserted' | 'errorMessage'>) {
+  await db.insert(syncLog).values({ provider: PROVIDER, entityType: 'fixtures', ...entry });
+  await db.delete(syncLog).where(lt(syncLog.ranAt, new Date(Date.now() - SYNC_LOG_RETENTION_MS)));
+}
+
+/**
+ * Syncs every current season that is due (see CADENCE). `force` syncs all of them.
+ * One league failing doesn't stop the others; failures are returned in `errors`.
+ */
+export async function syncFixtures({ force = false } = {}): Promise<SyncResult> {
   const startedAt = Date.now();
-  let totalUpserted = 0;
+  const result: SyncResult = { synced: [], skipped: 0, processed: 0, changed: 0, errors: [] };
 
   try {
-    for (const config of LEAGUES_TO_SYNC) {
-      const count = await syncLeague(config);
-      totalUpserted += count;
-    }
-
-    await db.insert(syncLog).values({
-      provider: PROVIDER, entityType: 'fixtures',
-      status: 'success', recordsUpserted: totalUpserted,
+    const activity = await loadSeasonActivity();
+    const due = activity.filter(a => {
+      const config = LEAGUE_CONFIG[a.slug];
+      return config != null && (force || isDue(a, config, startedAt));
     });
+    result.skipped = activity.length - due.length;
 
-    console.log(`[sync] OK — ${totalUpserted} fixtures processed in ${Date.now() - startedAt}ms`);
-    return { upserted: totalUpserted };
+    if (due.length > 0) {
+      const ctx = await loadContext();
 
+      for (const season of due) {
+        try {
+          const { processed, changed } = await syncLeague(season, LEAGUE_CONFIG[season.slug], ctx);
+          await db.update(seasons)
+            .set({ lastSyncedAt: new Date() })
+            .where(eq(seasons.id, season.seasonId));
+
+          result.synced.push(season.slug);
+          result.processed += processed;
+          result.changed   += changed;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`[sync:${season.slug}] Error:`, message);
+          result.errors.push(`${season.slug}: ${message}`);
+        }
+      }
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[sync] Error:', message);
-
-    await db.insert(syncLog).values({
-      provider: PROVIDER, entityType: 'fixtures',
-      status: 'error', errorMessage: message,
-    }).catch(() => {});
-
-    throw err;
+    result.errors.push(message);
   }
+
+  // Quiet runs leave no trace; only changes and errors are logged
+  if (result.errors.length > 0) {
+    await writeSyncLog({
+      status: 'error', recordsUpserted: result.changed, errorMessage: result.errors.join('\n'),
+    }).catch(() => {});
+  } else if (result.changed > 0) {
+    await writeSyncLog({ status: 'success', recordsUpserted: result.changed });
+  }
+
+  if (result.synced.length > 0) {
+    console.log(
+      `[sync] ${result.synced.join(', ')} — ${result.processed} events, ` +
+      `${result.changed} changed in ${Date.now() - startedAt}ms`
+    );
+  }
+
+  return result;
 }

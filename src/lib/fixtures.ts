@@ -1,7 +1,21 @@
+import { unstable_cache } from 'next/cache';
 import type { FixtureStatus, Fixture, FixturesQueryParams, FixturesResponse } from './types';
 import { MOCK_FIXTURES } from './mock-data';
 
 // ── Public API ─────────────────────────────────────────────────────────────────
+
+/** Expired by /api/cron/sync whenever the sync changes fixture data */
+export const FIXTURES_CACHE_TAG = 'fixtures';
+
+/**
+ * getFixtures, cached across requests. Page views don't hit the DB until the sync
+ * expires the tag; the hourly revalidate is a safety net.
+ */
+export const getCachedFixtures = unstable_cache(
+  (params: FixturesQueryParams) => getFixtures(params),
+  ['fixtures'],
+  { tags: [FIXTURES_CACHE_TAG], revalidate: 3600 },
+);
 
 export async function getFixtures(params: FixturesQueryParams = {}): Promise<FixturesResponse> {
   const fixtures = process.env.DATABASE_URL

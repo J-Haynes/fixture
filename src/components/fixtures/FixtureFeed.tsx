@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import type { Fixture } from '@/lib/types';
 import { toLocalDateKey } from '@/lib/dates';
 import { DateGroup } from './DateGroup';
@@ -9,18 +9,43 @@ type View = 'upcoming' | 'results';
 
 const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled']);
 
-interface Props {
-  fixtures: Fixture[];
+// A scheduled game that kicked off over 10 minutes ago should have been marked live by
+// the sync; hide it rather than show a stale kickoff time.
+const STALE_SCHEDULED_MS = 10 * 60 * 1000;
+
+const CLOCK_TICK_MS = 60 * 1000;
+
+function subscribeClock(onTick: () => void) {
+  const id = setInterval(onTick, CLOCK_TICK_MS);
+  return () => clearInterval(id);
 }
 
-export function FixtureFeed({ fixtures }: Props) {
+function getClock() {
+  return Math.floor(Date.now() / CLOCK_TICK_MS) * CLOCK_TICK_MS;
+}
+
+interface Props {
+  fixtures: Fixture[];
+  /** When the (cached) server render happened — used as "now" during hydration */
+  renderedAt: number;
+}
+
+export function FixtureFeed({ fixtures, renderedAt }: Props) {
   const [view, setView] = useState<View>('upcoming');
+  // The page HTML is cached, so hydrate with the render time (matching the server
+  // markup) and then switch to the real clock, ticking once a minute.
+  const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
 
   const grouped = useMemo(() => {
+    const cutoff = now - STALE_SCHEDULED_MS;
+    const current = fixtures.filter(
+      f => f.status !== 'scheduled' || Date.parse(f.scheduledAt) >= cutoff
+    );
+
     const filtered =
       view === 'upcoming'
-        ? fixtures.filter(f => UPCOMING_STATUSES.has(f.status))
-        : [...fixtures.filter(f => f.status === 'finished')].reverse();
+        ? current.filter(f => UPCOMING_STATUSES.has(f.status))
+        : [...current.filter(f => f.status === 'finished')].reverse();
 
     const map = new Map<string, Fixture[]>();
     for (const f of filtered) {
@@ -30,7 +55,7 @@ export function FixtureFeed({ fixtures }: Props) {
       map.set(key, bucket);
     }
     return Array.from(map.entries());
-  }, [fixtures, view]);
+  }, [fixtures, view, now]);
 
   return (
     <>
