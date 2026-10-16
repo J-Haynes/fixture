@@ -8,4 +8,4 @@ export const syncLog = pgTable('sync_log', {
   recordsUpserted: integer('records_upserted'),
   errorMessage:    text('error_message'),
   ranAt:           timestamp('ran_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();

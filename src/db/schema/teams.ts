@@ -9,4 +9,4 @@ export const teams = pgTable('teams', {
   slug:      text('slug').notNull().unique(),
   logoUrl:   text('logo_url'),
   country:   text('country'),
-});
+}).enableRLS();

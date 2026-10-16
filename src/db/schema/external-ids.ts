@@ -11,4 +11,4 @@ export const externalIds = pgTable('external_ids', {
 }, table => ({
   uniqProviderEntity: unique('external_ids_provider_entity_key')
     .on(table.entityType, table.entityId, table.provider),
-}));
+})).enableRLS();

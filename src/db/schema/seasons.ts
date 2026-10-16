@@ -10,4 +10,4 @@ export const seasons = pgTable('seasons', {
   isCurrent: boolean('is_current').default(false),
 }, table => ({
   uniqLeagueYear: unique('seasons_league_year_key').on(table.leagueId, table.year),
-}));
+})).enableRLS();

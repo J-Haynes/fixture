@@ -14,4 +14,4 @@ export const fixtures = pgTable('fixtures', {
   homeScore:   integer('home_score'),
   awayScore:   integer('away_score'),
   sportMeta:   jsonb('sport_meta').$type<Record<string, unknown>>(), // sport-specific overflow
-});
+}).enableRLS();
