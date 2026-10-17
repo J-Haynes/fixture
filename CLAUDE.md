@@ -354,7 +354,8 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
 - **Screenshots in PRs:** for any visible UI change, add a screenshot to the PR description. Take it at 375 px wide
   with headless Playwright (the screenshots used to verify the change are fine). Shrink it with
   `sharp().resize({ width: 750 }).png({ palette: true })` (≈30 KB). Commit it to the orphan branch
-  **`pr-screenshots`** under `pr-<number>/`; it's never merged, so images stay out of `main` and the build. Embed it
+  **`pr-screenshots`** under `pr-<number>/`; it's never merged, so images stay out of `main` and the build. Its own
+  `vercel.json` (`git.deploymentEnabled: false`) stops Vercel from trying (and failing) to build it; keep it. Embed it
   with `<img src="https://raw.githubusercontent.com/J-Haynes/fixture/pr-screenshots/pr-<n>/<name>.png" width="375">`
   (the repo is public). Use a separate `git worktree` for that branch. If `gh pr edit` fails with a "Projects
   (classic)" GraphQL error, update the body with `gh api -X PATCH repos/J-Haynes/fixture/pulls/<n> -F body=@file`.
