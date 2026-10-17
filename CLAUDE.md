@@ -181,6 +181,9 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
   `fixture_cron_secret`. This is cheap because quiet runs return after one DB query, and the real cadence lives in
   code (`CADENCE`), not in the cron schedule. The SQL file is applied by hand in the Supabase SQL editor; it is
   **not** part of `db:push`. Debug through `cron.job_run_details` and `net._http_response` (queries are in the file).
+- **Vercel region**: functions are pinned to `syd1` in [vercel.json](vercel.json), next to the Supabase database
+  (`ap-southeast-2`). In the default `iad1`, every query crossed the Pacific: a quiet sync run took about 1.6 s of
+  wall time (billed as provisioned memory) for about 110 ms of CPU. Hobby allows a single region.
 - **Vercel Cron**: daily backup run only (`0 4 * * *`). The Hobby plan rejects anything more frequent at deploy time,
   so don't add sub-daily Vercel crons. The route sets `maxDuration = 60`, which is the Hobby limit.
 - **Database client** ([src/db/index.ts](src/db/index.ts)): `max: 1` connection per serverless instance with
