@@ -15,6 +15,15 @@ export function formatKickoffTime(isoString: string): string {
   }).format(new Date(isoString));
 }
 
+/** Formats a date in the user's local timezone (e.g. "Sat 17 Oct"). */
+export function formatShortDate(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
+}
+
 /** Returns a human-readable date heading ("Today", "Tomorrow", "Mon 2 Jun"). */
 export function formatDateHeading(localDateKey: string): string {
   const now = new Date();

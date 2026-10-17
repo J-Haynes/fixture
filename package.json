@@ -13,7 +13,8 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:seed": "dotenv -e .env.local -- tsx src/db/seed.ts",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
-    "season": "dotenv -e .env.local -- tsx src/db/season.ts"
+    "season": "dotenv -e .env.local -- tsx src/db/season.ts",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
