@@ -3,17 +3,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
-
-// Two-tone gradients drawn from each league's actual brand palette.
-// from- = primary brand colour (darkened), to- = secondary/background tone.
-const LEAGUE_BANNER: Record<string, { strip: string; divider: string; text: string }> = {
-  'nrl':                 { strip: 'bg-gradient-to-r from-zinc-950 to-green-900',  divider: 'border-green-800/50',  text: 'text-white/85' },
-  'super-rugby-pacific': { strip: 'bg-gradient-to-r from-blue-950 to-teal-900',   divider: 'border-teal-800/50',   text: 'text-white/85' },
-  'fifa-world-cup':      { strip: 'bg-gradient-to-r from-zinc-950 to-yellow-500',  divider: 'border-amber-700/50',  text: 'text-white/85' },
-  'formula-1':           { strip: 'bg-gradient-to-r from-zinc-950 to-red-900',    divider: 'border-red-800/50',    text: 'text-white/85' },
-  'v8-supercars':        { strip: 'bg-gradient-to-r from-zinc-950 to-orange-900', divider: 'border-orange-800/50', text: 'text-white/85' },
-};
-const DEFAULT_BANNER = { strip: 'bg-zinc-800/60', divider: 'border-zinc-800', text: 'text-zinc-400' };
+import { leagueBanner } from '@/lib/league-theme';
 
 interface Props {
   fixture: Fixture;
@@ -26,7 +16,7 @@ export function FixtureCard({ fixture }: Props) {
   } = fixture;
 
   const isTeamMatch = homeTeam && awayTeam;
-  const banner = LEAGUE_BANNER[league.slug] ?? DEFAULT_BANNER;
+  const banner = leagueBanner(league.slug);
 
   return (
     <article className={`bg-zinc-900 rounded-xl border overflow-hidden ${

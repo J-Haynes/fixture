@@ -25,6 +25,9 @@ over to the next year by itself. All are `2026` as of Oct 2026; the World Cup is
 | `fifa-world-cup` | FIFA World Cup | 4429 | team vs team (national teams, `wc-<iso>` slugs) |
 | `formula-1` | Formula 1 | 4370 | event (races, sprints, qualifying; practice filtered out) |
 | `v8-supercars` | Supercars | 4489 | event |
+| `afl` | AFL | 4456 | team vs team (`afl-*` slugs, season `2026` until 2027 is published) |
+| `a-league-men` | A-League Men | 4356 | team vs team (`alm-*` slugs, season `2026-2027`) |
+| `premier-league` | Premier League | 4328 | team vs team (`epl-*` slugs, season `2026-2027`) |
 
 ## Tech stack
 
@@ -93,7 +96,7 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   clock, so cached HTML still hydrates cleanly. There is no client polling: data refreshes only on reload. Any polling
   added later must hit cached data.
 - **[src/components/fixtures/FixtureCard.tsx](src/components/fixtures/FixtureCard.tsx)**: per-league banner colours
-  (`LEAGUE_BANNER`, keyed by league slug). Uses `TeamMatchLayout` when both teams exist, otherwise `EventLayout`
+  come from `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts), shared with the menu. Uses `TeamMatchLayout` when both teams exist, otherwise `EventLayout`
   (motorsport: event name + podium from `sportMeta`).
 - **[src/lib/fixtures.ts](src/lib/fixtures.ts)**: `getFixtures()`, the one read path (DB or mock), plus
   `getCachedFixtures` and `FIXTURES_CACHE_TAG`. It uses dynamic imports so the postgres client isn't loaded when
@@ -102,6 +105,12 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   (hamburger + left drawer, portalled to `<body>`; empty apart from a placeholder Settings button), the centred logo,
   and `HeaderClock` (today's date/time, rendered only on the client). The minute clock lives in
   [src/lib/clock.ts](src/lib/clock.ts) and is shared with `FixtureFeed`.
+- **League filter:** the drawer's `LeagueFilterList` toggles leagues (with a placeholder "teams" button per league).
+  The leagues come from `getCachedLeagues` (active leagues, same cache tag). Choices live in `localStorage`
+  (`fixture:prefs`, read by `usePreferences()` in [src/lib/preferences.ts](src/lib/preferences.ts)), and
+  `FixtureFeed` filters on the client. Hidden leagues are stored rather than shown ones, so new leagues appear by
+  default. The server render always shows everything, so a returning user with hidden leagues sees them for an
+  instant before hydration.
 - **[src/lib/dates.ts](src/lib/dates.ts)**: all date display is in browser-local time. Elements that render dates
   use `suppressHydrationWarning`.
 
@@ -122,7 +131,9 @@ The sync is built to make as few API calls and DB writes as possible. Each run:
 2. Teams and team mappings are loaded **once** per run (`loadContext`).
 3. For each due league: make one `eventsseason.php` call, apply `sessionFilter`, then load that **season's** existing
    fixtures keyed by provider event ID.
-4. For each event: resolve teams (external ID first, then fuzzy `findTeamByName`, saving any new mapping). **Only
+4. For each event: resolve teams (external ID first, then fuzzy `findTeamByName` limited to the league's sport,
+   saving any new mapping). Rounds come from `roundLabel` (TheSportsDB codes: 0 = Opening Round, 500 = Pre-season,
+   200 = Final, other 100+ values = Finals). **Only
    columns that differ are UPDATEd**, so most runs write nothing. New events are INSERTed, along with an upserted
    `external_ids` row.
 5. Podium (`fetchResults` leagues): for finished events without `sportMeta.podium`, call `eventresults.php`. Empty
@@ -143,9 +154,12 @@ part of the change comparison in `syncLeague`**. Otherwise updates to it won't r
 `mapStatus` maps TheSportsDB `strStatus` to `FixtureStatus`. When the API gives no status, a kickoff in the past means
 `live` until `maxGameDurationHours` have elapsed, and `finished` after that.
 
-**Adding a league:** add the sport/league/season (and teams for team sports) to [src/db/seed.ts](src/db/seed.ts) and
-run `db:seed`. Add an entry to `LEAGUE_CONFIG`, a banner in `LEAGUE_BANNER`, and logos under `public/` (PNGs pre-sized
-to at most 144 px; see below). Update the table above. **New season:** automatic (step 6). To force one, or to start a season before the old one
+**Adding a league:** add it to [src/db/seed.ts](src/db/seed.ts). For team sports, use `seedTeamLeague` with each
+team's TheSportsDB `idTeam` (from `search_all_teams.php?l=<league name>`), so the sync maps teams by ID instead of
+guessing by name. Run `db:seed`. Add an entry to `LEAGUE_CONFIG`, a banner in `league-theme.ts`, and logos under
+`public/` (PNGs pre-sized to at most 144 px; see below). Seeding is safe ahead of a deploy: the sync skips leagues
+that have no `LEAGUE_CONFIG`, and a new season (null `last_synced_at`) is imported on the first cron run after
+deploy. Update the table above. **New season:** automatic (step 6). To force one, or to start a season before the old one
 has finished, run `npm run season -- roll <league> <year>`. Nothing in the code changes. `db:seed` only creates a
 league's *first* season and inserts no fixtures.
 
@@ -211,7 +225,7 @@ uses it plus `public/icon-{192,512}.png` and `icon-maskable-512.png`, made by `n
   config-like code. Match the surrounding style.
 - Store times in UTC and render them in local time. Never format dates on the server.
 - Static assets: league logos in `public/logos/`, Super Rugby teams in `public/rugby/`, NRL teams in
-  `public/rugbyleague/`, World Cup flags in `public/country/<iso>.svg`. Team avatars use `next/image` with
+  `public/rugbyleague/`, AFL in `public/afl/`, A-League Men in `public/aleague/`, Premier League in `public/epl/`, World Cup flags in `public/country/<iso>.svg`. Team avatars use `next/image` with
   `unoptimized`, and league logos use plain `<img>`. Neither goes through Vercel Image Optimization, so **resize
   PNG/JPG logos to at most 144 px before committing** (3× the largest 48 px display size).
 - [next.config.ts](next.config.ts) sets a strict CSP (`img-src 'self' data: blob:`, `connect-src 'self'`). Remote

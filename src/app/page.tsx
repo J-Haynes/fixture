@@ -2,7 +2,7 @@
 // whenever data changes; the hourly revalidate rolls the ±14-day window forward.
 export const revalidate = 3600;
 
-import { getCachedFixtures } from '@/lib/fixtures';
+import { getCachedFixtures, getCachedLeagues } from '@/lib/fixtures';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { FixtureFeed } from '@/components/fixtures/FixtureFeed';
 
@@ -19,11 +19,14 @@ export default async function HomePage() {
   const to = new Date(today);
   to.setDate(to.getDate() + 14); // show next 2 rounds of fixtures
 
-  const { fixtures } = await getCachedFixtures({ from: isoDate(from), to: isoDate(to) });
+  const [{ fixtures }, leagues] = await Promise.all([
+    getCachedFixtures({ from: isoDate(from), to: isoDate(to) }),
+    getCachedLeagues(),
+  ]);
 
   return (
     <>
-      <AppHeader />
+      <AppHeader leagues={leagues} />
       <main>
         <FixtureFeed fixtures={fixtures} renderedAt={today.getTime()} />
       </main>

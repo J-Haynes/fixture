@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from 'react';
 import type { Fixture } from '@/lib/types';
 import { toLocalDateKey } from '@/lib/dates';
 import { subscribeClock, getClock } from '@/lib/clock';
+import { usePreferences, showAllLeagues } from '@/lib/preferences';
 import { DateGroup } from './DateGroup';
 
 type View = 'upcoming' | 'results';
@@ -25,11 +26,13 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
   // The page HTML is cached, so hydrate with the render time (matching the server
   // markup) and then switch to the real clock, ticking once a minute.
   const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
+  const { hiddenLeagues } = usePreferences();
 
   const grouped = useMemo(() => {
     const cutoff = now - STALE_SCHEDULED_MS;
+    const hidden = new Set(hiddenLeagues);
     const current = fixtures.filter(
-      f => f.status !== 'scheduled' || Date.parse(f.scheduledAt) >= cutoff
+      f => !hidden.has(f.league.slug) && (f.status !== 'scheduled' || Date.parse(f.scheduledAt) >= cutoff)
     );
 
     const filtered =
@@ -45,7 +48,7 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
       map.set(key, bucket);
     }
     return Array.from(map.entries());
-  }, [fixtures, view, now]);
+  }, [fixtures, view, now, hiddenLeagues]);
 
   return (
     <>
@@ -57,6 +60,15 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
             <p className="font-medium text-zinc-500">
               {view === 'upcoming' ? 'No upcoming fixtures' : 'No recent results'}
             </p>
+            {hiddenLeagues.length > 0 && (
+              <button
+                type="button"
+                onClick={showAllLeagues}
+                className="mt-3 text-sm font-medium text-emerald-400 hover:text-emerald-300"
+              >
+                Show all leagues
+              </button>
+            )}
           </div>
         ) : (
           grouped.map(([dateKey, dayFixtures], i) => (

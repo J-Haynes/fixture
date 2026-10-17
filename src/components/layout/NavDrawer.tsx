@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import type { League } from '@/lib/types';
+import { LeagueFilterList } from './LeagueFilterList';
 
 const noopSubscribe = () => () => {};
 
 /** Hamburger button plus the slide-out menu drawer it opens. */
-export function NavDrawer() {
+export function NavDrawer({ leagues }: { leagues: League[] }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -85,8 +87,9 @@ export function NavDrawer() {
               </button>
             </div>
 
-            {/* Menu content goes here (leagues, My Teams, …) */}
-            <nav className="flex-1 overflow-y-auto" aria-label="Main" />
+            <nav className="flex-1 overflow-y-auto overscroll-contain" aria-label="Main">
+              <LeagueFilterList leagues={leagues} />
+            </nav>
 
             <div className="border-t border-zinc-800 p-2">
               {/* Placeholder: no settings page yet */}

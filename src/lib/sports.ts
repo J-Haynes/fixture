@@ -1,5 +1,8 @@
 const SPORT_EMOJIS: Record<string, string> = {
   rugby:              '🏉',
+  'rugby-league':     '🏉',
+  'australian-football': '🏉',
+  motorsport:         '🏎️',
   football:           '⚽',
   basketball:         '🏀',
   'formula-1':        '🏎️',

@@ -5,9 +5,9 @@
  *
  * Idempotent — safe to run multiple times.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from './index';
-import { sports, leagues, seasons, teams } from './schema';
+import { sports, leagues, seasons, teams, externalIds } from './schema';
 import { setCurrentSeason } from '@/lib/sync/seasons';
 
 /**
@@ -23,6 +23,57 @@ async function ensureSeason(leagueId: number, year: string): Promise<string> {
 
   await setCurrentSeason(leagueId, year);
   return year;
+}
+
+interface SeedTeam {
+  /** TheSportsDB idTeam, saved to external_ids so the sync never has to guess by name */
+  tsdbId:    string;
+  name:      string;
+  shortName: string;
+  slug:      string;
+  country:   string;
+}
+
+/**
+ * Upserts a team-sport league, its first season, its teams (logo at `${logoDir}/<slug minus prefix>.png`)
+ * and each team's TheSportsDB mapping.
+ */
+async function seedTeamLeague(opts: {
+  sportId: number; slug: string; name: string; shortName: string | null; country: string;
+  logoUrl: string; season: string; teams: SeedTeam[]; logoDir: string;
+}) {
+  const { sportId, slug, name, shortName, country, logoUrl, season, logoDir } = opts;
+
+  const [league] = await db
+    .insert(leagues)
+    .values({ sportId, name, shortName, slug, country, logoUrl, isActive: true })
+    .onConflictDoUpdate({ target: leagues.slug, set: { name, shortName, logoUrl } })
+    .returning();
+  console.log(`✓ League: ${league.name} (id ${league.id})`);
+  console.log(`✓ Season: ${name} ${await ensureSeason(league.id, season)} (current)`);
+
+  const rows = await db
+    .insert(teams)
+    .values(opts.teams.map(t => ({
+      sportId, name: t.name, shortName: t.shortName, slug: t.slug, country: t.country,
+      logoUrl: `${logoDir}/${t.slug.slice(t.slug.indexOf('-') + 1)}.png`,
+    })))
+    .onConflictDoUpdate({
+      target: teams.slug,
+      set: { name: sql`excluded.name`, shortName: sql`excluded.short_name`, logoUrl: sql`excluded.logo_url` },
+    })
+    .returning({ id: teams.id, slug: teams.slug });
+
+  const idBySlug = new Map(rows.map(r => [r.slug, r.id]));
+  for (const t of opts.teams) {
+    await db.insert(externalIds)
+      .values({ entityType: 'team', entityId: idBySlug.get(t.slug)!, provider: 'thesportsdb', externalId: t.tsdbId })
+      .onConflictDoUpdate({
+        target: [externalIds.provider, externalIds.entityType, externalIds.externalId],
+        set:    { entityId: idBySlug.get(t.slug)! },
+      });
+  }
+  console.log(`✓ Teams: ${opts.teams.length} ${name} teams + TheSportsDB mappings upserted`);
 }
 
 async function main() {
@@ -280,6 +331,95 @@ async function main() {
 
   console.log(`✓ Season: V8 Supercars ${await ensureSeason(v8Supercars.id, '2026')} (current)`);
   console.log('  ↳ Motorsport fixtures will be populated by the sync cron (npm run sync)');
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Australian Football — AFL
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const [australianFootball] = await db
+    .insert(sports)
+    .values({ name: 'Australian Football', slug: 'australian-football' })
+    .onConflictDoUpdate({ target: sports.slug, set: { name: 'Australian Football' } })
+    .returning();
+  console.log(`\n✓ Sport: ${australianFootball.name} (id ${australianFootball.id})`);
+
+  const aflTeams: SeedTeam[] = [
+    { tsdbId: '135684', name: 'Adelaide Crows',      shortName: 'ADE', slug: 'afl-adelaide',         country: 'Australia' },
+    { tsdbId: '135685', name: 'Brisbane Lions',      shortName: 'BRI', slug: 'afl-brisbane',         country: 'Australia' },
+    { tsdbId: '135686', name: 'Carlton Blues',       shortName: 'CAR', slug: 'afl-carlton',          country: 'Australia' },
+    { tsdbId: '135687', name: 'Collingwood Magpies', shortName: 'COL', slug: 'afl-collingwood',      country: 'Australia' },
+    { tsdbId: '135688', name: 'Essendon Bombers',    shortName: 'ESS', slug: 'afl-essendon',         country: 'Australia' },
+    { tsdbId: '135689', name: 'Fremantle Dockers',   shortName: 'FRE', slug: 'afl-fremantle',        country: 'Australia' },
+    { tsdbId: '135690', name: 'Geelong Cats',        shortName: 'GEE', slug: 'afl-geelong',          country: 'Australia' },
+    { tsdbId: '135691', name: 'Gold Coast Suns',     shortName: 'GCS', slug: 'afl-gold-coast',       country: 'Australia' },
+    { tsdbId: '135692', name: 'GWS Giants',          shortName: 'GWS', slug: 'afl-gws',              country: 'Australia' },
+    { tsdbId: '135693', name: 'Hawthorn Hawks',      shortName: 'HAW', slug: 'afl-hawthorn',         country: 'Australia' },
+    { tsdbId: '135694', name: 'Melbourne Demons',    shortName: 'MEL', slug: 'afl-melbourne',        country: 'Australia' },
+    { tsdbId: '135695', name: 'North Melbourne',     shortName: 'NTH', slug: 'afl-north-melbourne',  country: 'Australia' },
+    { tsdbId: '135696', name: 'Port Adelaide',       shortName: 'PTA', slug: 'afl-port-adelaide',    country: 'Australia' },
+    { tsdbId: '135697', name: 'Richmond Tigers',     shortName: 'RIC', slug: 'afl-richmond',         country: 'Australia' },
+    { tsdbId: '135698', name: 'St Kilda Saints',     shortName: 'STK', slug: 'afl-st-kilda',         country: 'Australia' },
+    { tsdbId: '135699', name: 'Sydney Swans',        shortName: 'SYD', slug: 'afl-sydney',           country: 'Australia' },
+    { tsdbId: '135700', name: 'West Coast Eagles',   shortName: 'WCE', slug: 'afl-west-coast',       country: 'Australia' },
+    { tsdbId: '135701', name: 'Western Bulldogs',    shortName: 'WBD', slug: 'afl-western-bulldogs', country: 'Australia' },
+  ];
+
+  await seedTeamLeague({
+    sportId: australianFootball.id, slug: 'afl', name: 'AFL', shortName: 'AFL', country: 'Australia',
+    logoUrl: '/logos/afl.png', season: '2026', teams: aflTeams, logoDir: '/afl',
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Football — A-League Men + Premier League
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const aLeagueTeams: SeedTeam[] = [
+    { tsdbId: '134472', name: 'Adelaide United',          shortName: 'ADL', slug: 'alm-adelaide-united',          country: 'Australia' },
+    { tsdbId: '149411', name: 'Auckland FC',              shortName: 'AFC', slug: 'alm-auckland-fc',              country: 'New Zealand' },
+    { tsdbId: '134476', name: 'Brisbane Roar',            shortName: 'BRI', slug: 'alm-brisbane-roar',            country: 'Australia' },
+    { tsdbId: '134479', name: 'Central Coast Mariners',   shortName: 'CCM', slug: 'alm-central-coast-mariners',   country: 'Australia' },
+    { tsdbId: '138063', name: 'Macarthur FC',             shortName: 'MAC', slug: 'alm-macarthur',                country: 'Australia' },
+    { tsdbId: '134634', name: 'Melbourne City',           shortName: 'MCY', slug: 'alm-melbourne-city',           country: 'Australia' },
+    { tsdbId: '134477', name: 'Melbourne Victory',        shortName: 'MVC', slug: 'alm-melbourne-victory',        country: 'Australia' },
+    { tsdbId: '134474', name: 'Newcastle Jets',           shortName: 'NEW', slug: 'alm-newcastle-jets',           country: 'Australia' },
+    { tsdbId: '134481', name: 'Perth Glory',              shortName: 'PER', slug: 'alm-perth-glory',              country: 'Australia' },
+    { tsdbId: '134473', name: 'Sydney FC',                shortName: 'SYD', slug: 'alm-sydney-fc',                country: 'Australia' },
+    { tsdbId: '134475', name: 'Wellington Phoenix',       shortName: 'WEL', slug: 'alm-wellington-phoenix',       country: 'New Zealand' },
+    { tsdbId: '134480', name: 'Western Sydney Wanderers', shortName: 'WSW', slug: 'alm-western-sydney-wanderers', country: 'Australia' },
+  ];
+
+  await seedTeamLeague({
+    sportId: football.id, slug: 'a-league-men', name: 'A-League Men', shortName: 'A-League', country: 'Australia',
+    logoUrl: '/logos/a-league-men.png', season: '2026-2027', teams: aLeagueTeams, logoDir: '/aleague',
+  });
+
+  const eplTeams: SeedTeam[] = [
+    { tsdbId: '133604', name: 'Arsenal',                shortName: 'ARS', slug: 'epl-arsenal',           country: 'England' },
+    { tsdbId: '133601', name: 'Aston Villa',            shortName: 'AVL', slug: 'epl-aston-villa',       country: 'England' },
+    { tsdbId: '134301', name: 'Bournemouth',            shortName: 'BOU', slug: 'epl-bournemouth',       country: 'England' },
+    { tsdbId: '134355', name: 'Brentford',              shortName: 'BRE', slug: 'epl-brentford',         country: 'England' },
+    { tsdbId: '133619', name: 'Brighton & Hove Albion', shortName: 'BHA', slug: 'epl-brighton',          country: 'England' },
+    { tsdbId: '133610', name: 'Chelsea',                shortName: 'CHE', slug: 'epl-chelsea',           country: 'England' },
+    { tsdbId: '133625', name: 'Coventry City',          shortName: 'COV', slug: 'epl-coventry-city',     country: 'England' },
+    { tsdbId: '133632', name: 'Crystal Palace',         shortName: 'CRY', slug: 'epl-crystal-palace',    country: 'England' },
+    { tsdbId: '133615', name: 'Everton',                shortName: 'EVE', slug: 'epl-everton',           country: 'England' },
+    { tsdbId: '133600', name: 'Fulham',                 shortName: 'FUL', slug: 'epl-fulham',            country: 'England' },
+    { tsdbId: '133617', name: 'Hull City',              shortName: 'HUL', slug: 'epl-hull-city',         country: 'England' },
+    { tsdbId: '133622', name: 'Ipswich Town',           shortName: 'IPS', slug: 'epl-ipswich-town',      country: 'England' },
+    { tsdbId: '133635', name: 'Leeds United',           shortName: 'LEE', slug: 'epl-leeds-united',      country: 'England' },
+    { tsdbId: '133602', name: 'Liverpool',              shortName: 'LIV', slug: 'epl-liverpool',         country: 'England' },
+    { tsdbId: '133613', name: 'Manchester City',        shortName: 'MCI', slug: 'epl-manchester-city',   country: 'England' },
+    { tsdbId: '133612', name: 'Manchester United',      shortName: 'MUN', slug: 'epl-manchester-united', country: 'England' },
+    { tsdbId: '134777', name: 'Newcastle United',       shortName: 'NEW', slug: 'epl-newcastle-united',  country: 'England' },
+    { tsdbId: '133720', name: 'Nottingham Forest',      shortName: 'NFO', slug: 'epl-nottingham-forest', country: 'England' },
+    { tsdbId: '133603', name: 'Sunderland',             shortName: 'SUN', slug: 'epl-sunderland',        country: 'England' },
+    { tsdbId: '133616', name: 'Tottenham Hotspur',      shortName: 'TOT', slug: 'epl-tottenham',         country: 'England' },
+  ];
+
+  await seedTeamLeague({
+    sportId: football.id, slug: 'premier-league', name: 'Premier League', shortName: null, country: 'England',
+    logoUrl: '/logos/premier-league.png', season: '2026-2027', teams: eplTeams, logoDir: '/epl',
+  });
 
   console.log('\n✅ Seed complete.');
   process.exit(0);
