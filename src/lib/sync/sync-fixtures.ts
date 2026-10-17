@@ -18,10 +18,19 @@ interface LeagueConfig {
   sessionFilter?:       (event: TsdbEvent) => boolean;
   /** League-specific round label, replacing the generic roundLabel(intRound) */
   roundLabel?:          (event: TsdbEvent) => string | null;
+  /** Years between editions, for rollover (default 1; a World Cup is 4) */
+  seasonStep?:          number;
 }
 
 /** Champions League qualifiers and play-offs run in July–August; the league phase starts in September */
 const isUclQualifier = (e: TsdbEvent) => [7, 8].includes(Number(e.strTimestamp.slice(5, 7)));
+
+/** TheSportsDB idTeam of the All Blacks */
+const ALL_BLACKS = '137133';
+const isAllBlacksGame = (e: TsdbEvent) => e.idHomeTeam === ALL_BLACKS || e.idAwayTeam === ALL_BLACKS;
+
+/** Rugby World Cup: pool rounds 1–5, then 125/150/160/200 for the knockouts */
+const RWC_ROUNDS: Record<number, string> = { 125: 'Quarter-final', 150: 'Semi-final', 160: 'Bronze final', 200: 'Final' };
 
 // Provider config, keyed by league slug. Which season gets synced comes from the DB
 // (seasons.is_current + leagues.is_active), so no code change is needed between seasons.
@@ -57,6 +66,37 @@ const LEAGUE_CONFIG: Record<string, LeagueConfig> = {
     maxGameDurationHours: 2,
     fetchResults:     true,
     eventNameAsLabel: true,
+  },
+  'nba': {
+    apiId: '4387',
+    maxGameDurationHours: 3,
+    sessionFilter: e => e.intRound !== '500', // pre-season
+    // Regular-season intRound is a week number (or 0 before it's assigned), which means nothing to fans
+    roundLabel: e => {
+      const n = Number(e.intRound);
+      if (n === 400) return 'Play-In';
+      if (n === 200) return 'NBA Finals';
+      return n >= 100 ? 'Playoffs' : null;
+    },
+  },
+  // All Blacks: every competition they play in. Tests outside a championship (tours, the
+  // Bledisloe in years without a Rugby Championship) are TheSportsDB "International Friendlies".
+  'nations-championship': { apiId: '5852', maxGameDurationHours: 2.5, seasonStep: 2 },
+  'rugby-championship':   { apiId: '4986', maxGameDurationHours: 2.5 },
+  'rugby-world-cup': {
+    apiId: '4574',
+    maxGameDurationHours: 2.5,
+    seasonStep: 4,
+    roundLabel: e => {
+      const n = Number(e.intRound);
+      return RWC_ROUNDS[n] ?? (n > 0 && n < 100 ? `Pool round ${n}` : null);
+    },
+  },
+  'all-blacks-tests': {
+    apiId: '5479',
+    maxGameDurationHours: 2.5,
+    sessionFilter: isAllBlacksGame,
+    roundLabel: () => null, // intRound is always 0, which would read "Opening Round"
   },
 };
 
@@ -152,8 +192,9 @@ function isDue(activity: SeasonActivity, config: LeagueConfig, now: number): boo
 
 // TheSportsDB follows API-Football's codes: AET/PEN are *finished* after extra time or a
 // shoot-out, while ET/BT/P are extra time, the break before it, and a shoot-out in progress.
-const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN']);
-const LIVE_STATUSES     = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'Break', 'Live', 'Q1', 'Q2', 'Q3', 'Q4']);
+// Basketball adds Q1–Q4 and OT in play, and AOT for finished after overtime.
+const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'AOT']);
+const LIVE_STATUSES     = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'Break', 'Live', 'Q1', 'Q2', 'Q3', 'Q4', 'OT']);
 
 function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatus {
   if (event.strPostponed === 'yes')        return 'postponed';
@@ -253,7 +294,8 @@ async function resolveTeam(
   if (mapped != null || !name) return mapped;
 
   // Only match within the league's sport ("Melbourne City" must not match an NRL "… City")
-  const teamId = findTeamByName(name, ctx.allTeams.filter(t => t.sportId === sportId));
+  const teamId = findTeamByName(name, ctx.allTeams.filter(t => t.sportId === sportId))
+    ?? (externalId ? await createTeam(externalId, name, sportId, ctx) : undefined);
   if (teamId != null && externalId) {
     await db.insert(externalIds).values({
       entityType: 'team', entityId: teamId,
@@ -262,6 +304,29 @@ async function resolveTeam(
     ctx.teamExtMap.set(externalId, teamId);
   }
   return teamId;
+}
+
+/** Knockout placeholders ("Winner Pool A", "TBC") are not teams */
+const PLACEHOLDER_TEAM = /^(tb[cd]|winner|runner|loser)\b/i;
+
+/**
+ * Last resort for an opponent nobody seeded (a one-off test against the Barbarians, a club
+ * new to a competition): create a bare team so the fixture still shows both sides. It has no
+ * logo, so the card shows initials; seed it properly to add one.
+ */
+async function createTeam(externalId: string, name: string, sportId: number, ctx: SyncContext): Promise<number | undefined> {
+  if (PLACEHOLDER_TEAM.test(name)) return undefined;
+  const clean = name.replace(/\s+Rugby$/i, '').trim();
+  const slug  = `${clean.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${externalId}`;
+
+  const [team] = await db.insert(teams)
+    .values({ sportId, name: clean, slug })
+    .onConflictDoUpdate({ target: teams.slug, set: { name: clean } })
+    .returning({ id: teams.id });
+  ctx.allTeams.push({ id: team.id, name: clean, sportId });
+  console.warn(`[sync] Created team "${clean}" (${slug}) for unmapped TheSportsDB team ${externalId}`);
+  return team.id;
 }
 
 // ── Motorsport podium ─────────────────────────────────────────────────────────
@@ -460,13 +525,18 @@ async function syncLeague(
 // (one extra call, at the off-season cadence). When the next season has events,
 // it becomes the current season and the following cron run imports it.
 
+/**
+ * Over once its last fixture is a week old. A season that never got any fixtures (a competition
+ * not held that year, like the Rugby Championship in a World Cup year) is over once its year has passed.
+ */
 function seasonIsOver(season: SeasonActivity, now: number): boolean {
+  if (season.total === 0) return Number(season.year.slice(-4)) < new Date(now).getUTCFullYear();
   return season.lastKickoffMs != null && season.lastKickoffMs < now - SEASON_OVER_AFTER_MS;
 }
 
 /** Returns the new season's year if the league was rolled over */
 async function rollSeasonIfAvailable(season: SeasonActivity, config: LeagueConfig): Promise<string | null> {
-  const next = nextSeasonYear(season.year);
+  const next = nextSeasonYear(season.year, config.seasonStep);
   if (!next) return null;
 
   let events = await fetchSeasonEvents(config.apiId, next);

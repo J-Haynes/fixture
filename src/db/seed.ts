@@ -130,6 +130,77 @@ async function main() {
   console.log('  ↳ SRP fixtures will be populated by the sync cron (npm run sync)');
 
   // ══════════════════════════════════════════════════════════════════════════════
+  // Rugby Union internationals — every competition the All Blacks play in
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  // National sides share one row across competitions (TheSportsDB uses one idTeam each)
+  const rugbyNations: Record<string, SeedTeam> = Object.fromEntries(([
+    ['137133', 'New Zealand',   'NZL', 'New Zealand'  ],
+    ['137125', 'Australia',     'AUS', 'Australia'    ],
+    ['137137', 'South Africa',  'RSA', 'South Africa' ],
+    ['137124', 'Argentina',     'ARG', 'Argentina'    ],
+    ['137123', 'England',       'ENG', 'England'      ],
+    ['137128', 'France',        'FRA', 'France'       ],
+    ['137130', 'Ireland',       'IRE', 'Ireland'      ],
+    ['137136', 'Scotland',      'SCO', 'Scotland'     ],
+    ['137141', 'Wales',         'WAL', 'Wales'        ],
+    ['137175', 'Italy',         'ITA', 'Italy'        ],
+    ['137131', 'Japan',         'JPN', 'Japan'        ],
+    ['137127', 'Fiji',          'FIJ', 'Fiji'         ],
+    ['137129', 'Georgia',       'GEO', 'Georgia'      ],
+    ['137135', 'Samoa',         'SAM', 'Samoa'        ],
+    ['137138', 'Tonga',         'TGA', 'Tonga'        ],
+    ['137139', 'Uruguay',       'URU', 'Uruguay'      ],
+    ['137140', 'USA',           'USA', 'United States'],
+    ['137126', 'Canada',        'CAN', 'Canada'       ],
+    ['141517', 'Portugal',      'POR', 'Portugal'     ],
+    ['141518', 'Romania',       'ROU', 'Romania'      ],
+    ['141519', 'Spain',         'ESP', 'Spain'        ],
+    ['145720', 'Zimbabwe',      'ZIM', 'Zimbabwe'     ],
+    ['147338', 'Chile',         'CHI', 'Chile'        ],
+    ['148539', 'Hong Kong',     'HKG', 'Hong Kong'    ],
+    // South African franchises the All Blacks played on the 2026 tour
+    ['136670', 'Stormers',      'STO', 'South Africa' ],
+    ['136669', 'Sharks',        'SHA', 'South Africa' ],
+    ['136666', 'Bulls',         'BUL', 'South Africa' ],
+    ['136668', 'Lions',         'LIO', 'South Africa' ],
+  ] as const).map(([tsdbId, name, shortName, country]) => {
+    const slug = `rugby-${name.toLowerCase().replace(/\s+/g, '-')}`;
+    return [shortName, { tsdbId, name, shortName, slug, country }];
+  }));
+  const nations = (...codes: string[]) => codes.map(c => rugbyNations[c]);
+
+  await seedTeamLeague({
+    sportId: rugbyUnion.id, slug: 'nations-championship', name: 'Nations Championship', shortName: null,
+    country: 'International', logoUrl: '/logos/nations-championship.png', season: '2026', logoDir: '/rugby-intl',
+    teams: nations('NZL', 'AUS', 'RSA', 'ARG', 'JPN', 'FIJ', 'ENG', 'FRA', 'IRE', 'SCO', 'WAL', 'ITA'),
+  });
+
+  // Not held in 2026 (South Africa toured New Zealand instead); the sync moves on to the next
+  // edition by itself once 2027 has passed without fixtures
+  await seedTeamLeague({
+    sportId: rugbyUnion.id, slug: 'rugby-championship', name: 'The Rugby Championship', shortName: 'Rugby Championship',
+    country: 'International', logoUrl: '/logos/rugby-championship.png', season: '2027', logoDir: '/rugby-intl',
+    teams: nations('NZL', 'AUS', 'RSA', 'ARG'),
+  });
+
+  await seedTeamLeague({
+    sportId: rugbyUnion.id, slug: 'rugby-world-cup', name: 'Rugby World Cup', shortName: null,
+    country: 'International', logoUrl: '/logos/rugby-world-cup.png', season: '2027', logoDir: '/rugby-intl',
+    teams: nations(
+      'NZL', 'AUS', 'RSA', 'ARG', 'ENG', 'FRA', 'IRE', 'SCO', 'WAL', 'ITA', 'JPN', 'FIJ',
+      'GEO', 'SAM', 'TGA', 'URU', 'USA', 'CAN', 'POR', 'ROU', 'ESP', 'ZIM', 'CHI', 'HKG',
+    ),
+  });
+
+  // TheSportsDB's "International Friendlies", filtered by the sync to All Blacks games
+  await seedTeamLeague({
+    sportId: rugbyUnion.id, slug: 'all-blacks-tests', name: 'All Blacks Tests', shortName: null,
+    country: 'New Zealand', logoUrl: '/logos/all-blacks-tests.png', season: '2026', logoDir: '/rugby-intl',
+    teams: nations('NZL', 'AUS', 'RSA', 'STO', 'SHA', 'BUL', 'LIO'),
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
   // Rugby League — NRL 2026
   // ══════════════════════════════════════════════════════════════════════════════
 
@@ -460,6 +531,44 @@ async function main() {
   await seedTeamLeague({
     sportId: football.id, slug: 'champions-league', name: 'UEFA Champions League', shortName: 'Champions League',
     country: 'Europe', logoUrl: '/logos/champions-league.png', season: '2026-2027', teams: uclClubs, logoDir: '/clubs',
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Basketball — NBA
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const [basketball] = await db
+    .insert(sports)
+    .values({ name: 'Basketball', slug: 'basketball' })
+    .onConflictDoUpdate({ target: sports.slug, set: { name: 'Basketball' } })
+    .returning();
+  console.log(`\n✓ Sport: ${basketball.name} (id ${basketball.id})`);
+
+  const nbaTeams: SeedTeam[] = ([
+    ['134880', 'Atlanta Hawks',          'ATL'], ['134860', 'Boston Celtics',         'BOS'],
+    ['134861', 'Brooklyn Nets',          'BKN'], ['134881', 'Charlotte Hornets',      'CHA'],
+    ['134870', 'Chicago Bulls',          'CHI'], ['134871', 'Cleveland Cavaliers',    'CLE'],
+    ['134875', 'Dallas Mavericks',       'DAL'], ['134885', 'Denver Nuggets',         'DEN'],
+    ['134872', 'Detroit Pistons',        'DET'], ['134865', 'Golden State Warriors',  'GSW'],
+    ['134876', 'Houston Rockets',        'HOU'], ['134873', 'Indiana Pacers',         'IND'],
+    ['134866', 'Los Angeles Clippers',   'LAC'], ['134867', 'Los Angeles Lakers',     'LAL'],
+    ['134877', 'Memphis Grizzlies',      'MEM'], ['134882', 'Miami Heat',             'MIA'],
+    ['134874', 'Milwaukee Bucks',        'MIL'], ['134886', 'Minnesota Timberwolves', 'MIN'],
+    ['134878', 'New Orleans Pelicans',   'NOP'], ['134862', 'New York Knicks',        'NYK'],
+    ['134887', 'Oklahoma City Thunder',  'OKC'], ['134883', 'Orlando Magic',          'ORL'],
+    ['134863', 'Philadelphia 76ers',     'PHI'], ['134868', 'Phoenix Suns',           'PHX'],
+    ['134888', 'Portland Trail Blazers', 'POR'], ['134869', 'Sacramento Kings',       'SAC'],
+    ['134879', 'San Antonio Spurs',      'SAS'], ['134864', 'Toronto Raptors',        'TOR'],
+    ['134889', 'Utah Jazz',              'UTA'], ['134884', 'Washington Wizards',     'WAS'],
+  ] as const).map(([tsdbId, name, shortName]) => ({
+    tsdbId, name, shortName,
+    slug:    `nba-${name.toLowerCase().replace(/\s+/g, '-')}`,
+    country: name === 'Toronto Raptors' ? 'Canada' : 'United States',
+  }));
+
+  await seedTeamLeague({
+    sportId: basketball.id, slug: 'nba', name: 'NBA', shortName: null, country: 'United States',
+    logoUrl: '/logos/nba.png', season: '2026-2027', teams: nbaTeams, logoDir: '/nba',
   });
 
   console.log('\n✅ Seed complete.');
