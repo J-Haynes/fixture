@@ -38,6 +38,22 @@ export async function fetchSeasonEvents(leagueId: string, season: string): Promi
   return data.events ?? [];
 }
 
+/**
+ * One day's events for a league. Unlike eventsseason.php (served from a cache that can
+ * be ~15 min stale), this is fresh, so the sync uses it for in-play status and scores.
+ */
+export async function fetchDayEvents(leagueId: string, date: string): Promise<TsdbEvent[]> {
+  const key = process.env.THESPORTSDB_API_KEY;
+  if (!key) throw new Error('THESPORTSDB_API_KEY is not set');
+
+  const url = `${BASE_URL}/${key}/eventsday.php?d=${date}&l=${leagueId}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`TheSportsDB request failed: ${res.status} ${res.statusText}`);
+
+  const data = await res.json() as { events: TsdbEvent[] | null };
+  return data.events ?? [];
+}
+
 export async function fetchEventResults(eventId: string): Promise<TsdbResult[]> {
   const key = process.env.THESPORTSDB_API_KEY;
   if (!key) throw new Error('THESPORTSDB_API_KEY is not set');

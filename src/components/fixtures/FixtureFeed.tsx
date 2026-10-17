@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Fixture } from '@/lib/types';
 import { toLocalDateKey } from '@/lib/dates';
 import { subscribeClock, getClock } from '@/lib/clock';
@@ -16,6 +17,12 @@ const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled'
 const STALE_SCHEDULED_MS = 10 * 60 * 1000;
 
 const noopSubscribe = () => () => {};
+
+// While a game is (or should be) in play, re-fetch the page data at the sync's cadence.
+// router.refresh() requests the ISR-cached route, so this never hits the database.
+const LIVE_REFRESH_MS = 2 * 60 * 1000;
+// Coming back to a tab or PWA left open: refresh if the data is older than this
+const RESUME_REFRESH_MS = 5 * 60 * 1000;
 
 interface Props {
   fixtures: Fixture[];
@@ -33,6 +40,29 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
   // fixtures by UTC day (a deterministic match); the client then regroups by local day.
   // Grouping by local day straight away changes the markup and breaks hydration.
   const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const router = useRouter();
+
+  // Live or past-kickoff fixtures mean the cached data is about to change
+  const inPlay = useMemo(
+    () => fixtures.some(f => f.status === 'live' || (f.status === 'scheduled' && Date.parse(f.scheduledAt) <= now)),
+    [fixtures, now],
+  );
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - renderedAt > RESUME_REFRESH_MS) router.refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    const id = inPlay
+      ? setInterval(() => document.visibilityState === 'visible' && router.refresh(), LIVE_REFRESH_MS)
+      : undefined;
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(id);
+    };
+  }, [inPlay, renderedAt, router]);
 
   const grouped = useMemo(() => {
     const cutoff = now - STALE_SCHEDULED_MS;
