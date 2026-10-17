@@ -17,6 +17,11 @@ const LEAGUE_BANNER: Record<string, LeagueBanner> = {
   'a-league-men':        { strip: 'bg-gradient-to-r from-zinc-950 to-rose-700',    divider: 'border-rose-800/50',    text: 'text-white/85' },
   'champions-league':    { strip: 'bg-gradient-to-r from-slate-950 to-blue-800',  divider: 'border-blue-800/50',    text: 'text-white/85' },
   'premier-league':      { strip: 'bg-gradient-to-r from-purple-950 to-fuchsia-800', divider: 'border-fuchsia-800/50', text: 'text-white/85' },
+  'nba':                 { strip: 'bg-gradient-to-r from-blue-900 to-red-700',     divider: 'border-red-800/50',     text: 'text-white/85' },
+  'nations-championship':{ strip: 'bg-gradient-to-r from-zinc-950 to-lime-700',    divider: 'border-lime-800/50',    text: 'text-white/85' },
+  'rugby-championship':  { strip: 'bg-gradient-to-r from-zinc-950 to-sky-800',     divider: 'border-sky-800/50',     text: 'text-white/85' },
+  'rugby-world-cup':     { strip: 'bg-gradient-to-r from-zinc-950 to-orange-700',  divider: 'border-orange-800/50',  text: 'text-white/85' },
+  'all-blacks-tests':    { strip: 'bg-gradient-to-r from-black to-zinc-700',       divider: 'border-zinc-600/50',    text: 'text-white/85' },
 };
 
 const DEFAULT_BANNER: LeagueBanner = { strip: 'bg-zinc-800/60', divider: 'border-zinc-800', text: 'text-zinc-400' };

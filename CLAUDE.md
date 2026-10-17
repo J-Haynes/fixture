@@ -33,11 +33,20 @@ over to the next season by itself. Status as of Oct 2026:
 | `formula-1` | Formula 1 | 4370 | `2026` | event (races, sprints, qualifying; practice filtered out) |
 | `v8-supercars` | Supercars | 4489 | `2026` | event |
 | `fifa-world-cup` | FIFA World Cup | 4429 | `2026` | **inactive** (finished; next in 2030). National teams, `wc-<iso>` slugs |
+| `nba` | NBA | 4387 | `2026-2027` | team vs team (`nba-*`); pre-season (`intRound` 500) filtered out |
+| `nations-championship` | Nations Championship | 5852 | `2026` (→ 2028, `seasonStep: 2`) | rugby nations (`rugby-*`); July + November windows |
+| `rugby-championship` | The Rugby Championship | 4986 | `2027` (no fixtures yet) | not held in 2026; skips ahead by itself once an empty year has passed |
+| `rugby-world-cup` | Rugby World Cup | 4574 | `2027` (→ 2031, `seasonStep: 4`) | rugby nations (`rugby-*`); pool rounds 1–5, then 125/150/160/200 knockouts |
+| `all-blacks-tests` | All Blacks Tests | 5479 | `2026` | TheSportsDB "Rugby Union International Friendlies", **filtered to All Blacks games** (tours, Bledisloe outside a championship) |
+
+The four rugby-union international competitions exist so that no All Blacks game is missed. The Rugby Championship
+is seeded ahead of its return. Not covered: Māori All Blacks, All Blacks XV, and sevens.
 
 **Teams are shared across competitions.** TheSportsDB uses one `idTeam` per club, and the sync resolves teams by
 that ID first, so Arsenal's Premier League and Champions League fixtures point at the same `teams` row, and
 following Arsenal covers both. When adding a competition, seed only the clubs we don't have yet; slugs keep their
-original prefix. National teams are separate teams from clubs.
+original prefix. National teams are separate teams from clubs, and per sport: football nations are `wc-<iso>`, rugby
+nations are `rugby-<name>` (shared by all four rugby international competitions).
 
 ## Tech stack
 
@@ -78,8 +87,10 @@ it's missing. With an unreachable URL, the page prerenders from mock data.
 
 **There is only one database, and it is production's.** `.env.local` points at the live Supabase DB, so `db:seed`,
 `season`, and `sync` run from a dev server all write production data, and fixture.nz shows the results on its next
-revalidation. Seeding leagues/teams is invisible until fixtures exist, so seed ahead of a deploy, but don't import
-fixtures for a new league before the code (config, logos, banner) is live. Locally, `unstable_cache` entries persist
+revalidation. Seeding leagues/teams is invisible until fixtures exist (the menu lists only leagues whose current
+season has fixtures), so seed ahead of a deploy, but don't import fixtures for a new league before the code (config,
+logos, banner) is live. Running `npm run sync` against a local dev server with new `LEAGUE_CONFIG` entries counts as
+importing. Locally, `unstable_cache` entries persist
 in `.next/cache/fetch-cache` across builds; delete it if a local build shows stale data.
 
 ## Environment variables (`.env.local`, git-ignored)
@@ -133,8 +144,8 @@ breaks hydration (React #418).
   centred logo. On the right, `HeaderClock` (today's date/time, client-only). The drawer holds `LeagueFilterList`
   and a placeholder **Settings** button that does nothing yet.
 - **[src/lib/fixtures.ts](src/lib/fixtures.ts)**: the read path, with DB or mock data. `getFixtures`/`getCachedFixtures`
-  return the fixtures in a window. `getLeagues`/`getCachedLeagues` return the active leagues, each with its
-  current-season teams, built from its fixtures (so a league shows no teams until its fixtures are imported). It
+  return the fixtures in a window. `getLeagues`/`getCachedLeagues` return the active leagues whose current season has
+  fixtures, each with its current-season teams, built from those fixtures. It
   uses dynamic imports so the postgres client isn't loaded when there is no DB. If the DB is unreachable, the mock
   fallback can stay cached for up to an hour.
 - **[src/lib/dates.ts](src/lib/dates.ts)**: all date display is in browser-local time. Elements that render dates
@@ -183,18 +194,26 @@ The sync is built to make as few API calls and DB writes as possible. Each run:
    event ID.
 4. For each event:
    - **Teams:** resolve by external ID first, then fuzzy `findTeamByName`, which is limited to the league's sport
-     (otherwise "Melbourne City" could match a team in another sport). Any new mapping is saved.
+     (otherwise "Melbourne City" could match a team in another sport). As a last resort, `createTeam` adds a bare
+     team (slug `<name>-<idTeam>`, no logo, so the card shows initials) for an unseeded opponent such as the
+     Barbarians; placeholders like "Winner Pool A" are skipped. It logs a warning, and you should seed the team
+     properly to give it a logo. Any new mapping is saved.
    - **Rounds:** `roundLabel` maps TheSportsDB codes: 0 = Opening Round, 500 = Pre-season, 200 = Final, other 100+
-     values = Finals. `LeagueConfig.roundLabel` overrides this per league; the Champions League uses "League phase ·
-     MD n" / "Knockouts".
-   - **Status:** codes follow API-Football. `FT`/`AET`/`PEN` are finished; `ET`/`BT`/`P` are extra time, the break
-     before it, and a shoot-out in progress.
+     values = Finals. `LeagueConfig.roundLabel` overrides this per league: the Champions League uses "League phase ·
+     MD n" / "Knockouts", the RWC "Pool round n" / Quarter-final…, and the NBA labels only Play-In (400), Playoffs and
+     NBA Finals. Leagues whose `intRound` is always 0 (NBA before weeks are assigned, friendlies) need an override,
+     or every game reads "Opening Round".
+   - **Status:** codes follow API-Football. `FT`/`AET`/`PEN` (and basketball's `AOT`, after overtime) are
+     finished; `ET`/`BT`/`P` are extra time, the break before it, and a shoot-out in progress. Basketball in play is
+     `Q1`–`Q4`/`HT`/`OT`.
    - **Writes:** only columns that differ are UPDATEd, so most runs write nothing. New events are INSERTed, along
      with an upserted `external_ids` row.
 5. Podium (`fetchResults` leagues): for finished events without `sportMeta.podium`, call `eventresults.php`. Empty
    results set `sportMeta.podiumCheckedAt`; the call is retried every 30 min and abandoned 3 days after the event.
 6. **Season rollover:** if a synced season's last fixture was more than 7 days ago, ask the provider for the next
-   season (`nextSeasonYear`: `2026` → `2027`, `2025-2026` → `2026-2027`). If it has events, `setCurrentSeason`
+   season (`nextSeasonYear`: `2026` → `2027`, `2025-2026` → `2026-2027`; `LeagueConfig.seasonStep` skips years for
+   competitions that aren't held every year). A season with no fixtures at all counts as over once its year has
+   passed, so a competition that skipped a year moves on. If the next season has events, `setCurrentSeason`
    ([src/lib/sync/seasons.ts](src/lib/sync/seasons.ts)) makes it the league's only current season, and the next
    cron run imports it. That's one extra API call per finished league per day. Rollovers show in `rolled` and in a
    `sync_log` row with `entity_type = 'seasons'`.
@@ -216,7 +235,9 @@ past means `live` until `maxGameDurationHours` have elapsed, and `finished` afte
    `lookup_all_teams.php` 404s.
 2. Run `db:seed`.
 3. Add an entry to `LEAGUE_CONFIG`, a banner in `league-theme.ts`, and logos under `public/` (PNGs pre-sized to at
-   most 144 px; see below). Cups should go in `MY_TEAMS_BY_DEFAULT`.
+   most 144 px; see below). Check the season's `intRound` values (see **Rounds**) and set `seasonStep` if it isn't
+   annual. Cups should go in `MY_TEAMS_BY_DEFAULT`. A league with hundreds of games in the ±14-day window (like the
+   NBA) costs page-render CPU on every live revalidation; see **Costs**.
 4. Update the table above.
 
 The new season (null `last_synced_at`) is imported on the first cron run after deploy. A first import of a few
@@ -279,9 +300,20 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
   - functions are pinned to **`syd1`** in [vercel.json](vercel.json), next to the Supabase DB (`ap-southeast-2`).
 
   Provisioned memory is billed on **wall time** (2 GB × duration), so network round trips are the cost. From
-  `iad1`, a quiet run took about 1.6 s for about 110 ms of CPU; from `syd1` it takes about 0.4 s. Hobby allows a
-  single region. Check usage with `npx vercel usage --since <date> --breakdown daily` and
-  `npx vercel metrics vercel.function_invocation.function_duration_ms -a avg -f "route eq '/api/cron/sync'" --since 24h`.
+  `iad1`, a run took about 1.6 s; from `syd1` (measured 17 Oct 2026) quiet hours average 0.1–0.3 s and matchday
+  hours 0.5–0.75 s, with about 54 ms of CPU. Hobby allows a single region.
+  - **Hobby allowances** (per month): 4 h Active CPU, 360 GB-h provisioned memory, 1M invocations, 200K ISR write
+    units and 1M ISR read units (8 KB each, compressed), 1M CDN requests, 100 GB Fast Data Transfer.
+  - **Where the risk is:** not the sync (about 6 GB-h and 20 min of CPU a month before the NBA) but **page
+    regeneration**. One render costs about 330 ms of CPU for 100 fixtures and grows with the fixture count. In a live
+    window each sync run with changes expires the page, and any viewer's 2-minute `router.refresh()` regenerates it.
+    The NBA is live about 9–10 h a day from October to June and roughly triples the fixtures in the window. With
+    someone watching through every NBA window, that is about 2.5 h of CPU and 100K ISR write units a month. With
+    occasional check-ins it is minor. The levers are fewer fixtures in the window (e.g. a shorter NBA window) and a
+    slower revalidation cadence during live play.
+  - Check usage with `npx vercel usage --since <date> --breakdown daily` and
+    `npx vercel metrics vercel.function_invocation.function_cpu_time_ms -a sum --group-by route --since 24h`
+    (`function_duration_ms` for wall time).
 - **Vercel Cron:** daily backup run only (`0 4 * * *`). Hobby rejects anything more frequent at deploy time, so
   don't add sub-daily Vercel crons.
 - **Supabase scheduling:** `pg_cron` + `pg_net` call `GET /api/cron/sync` every 2 minutes
@@ -322,7 +354,8 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
 - **Screenshots in PRs:** for any visible UI change, add a screenshot to the PR description. Take it at 375 px wide
   with headless Playwright (the screenshots used to verify the change are fine). Shrink it with
   `sharp().resize({ width: 750 }).png({ palette: true })` (≈30 KB). Commit it to the orphan branch
-  **`pr-screenshots`** under `pr-<number>/`; it's never merged, so images stay out of `main` and the build. Embed it
+  **`pr-screenshots`** under `pr-<number>/`; it's never merged, so images stay out of `main` and the build. Its own
+  `vercel.json` (`git.deploymentEnabled: false`) stops Vercel from trying (and failing) to build it; keep it. Embed it
   with `<img src="https://raw.githubusercontent.com/J-Haynes/fixture/pr-screenshots/pr-<n>/<name>.png" width="375">`
   (the repo is public). Use a separate `git worktree` for that branch. If `gh pr edit` fails with a "Projects
   (classic)" GraphQL error, update the body with `gh api -X PATCH repos/J-Haynes/fixture/pulls/<n> -F body=@file`.
@@ -336,8 +369,9 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
 - **Static assets:**
   - League logos are in `public/logos/`.
   - Teams: Super Rugby in `public/rugby/`, NRL in `public/rugbyleague/`, AFL in `public/afl/`, A-League Men in
-    `public/aleague/`, Premier League in `public/epl/`, other clubs (Champions League) in `public/clubs/`, and World
-    Cup flags in `public/country/<iso>.svg`.
+    `public/aleague/`, Premier League in `public/epl/`, other clubs (Champions League) in `public/clubs/`, NBA in
+    `public/nba/`, rugby nations (and the South African franchises from the 2026 All Blacks tour) in
+    `public/rugby-intl/`, and World Cup flags in `public/country/<iso>.svg`.
   - Team avatars use `next/image` with `unoptimized`, and league logos use plain `<img>`. Neither goes through Vercel
     Image Optimization, so **resize PNG/JPG logos to at most 144 px before committing** (3× the largest 48 px
     display size).

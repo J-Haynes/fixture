@@ -4,11 +4,14 @@ import { seasons } from '@/db/schema';
 
 type Conn = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** The season after `year`: "2026" → "2027", "2025-2026" → "2026-2027". Null for other formats. */
-export function nextSeasonYear(year: string): string | null {
-  if (/^\d{4}$/.test(year)) return String(Number(year) + 1);
+/**
+ * The season after `year`: "2026" → "2027", "2025-2026" → "2026-2027". Null for other formats.
+ * `step` skips years for competitions that aren't annual (a World Cup every 4 years: 2027 → 2031).
+ */
+export function nextSeasonYear(year: string, step = 1): string | null {
+  if (/^\d{4}$/.test(year)) return String(Number(year) + step);
   const span = /^(\d{4})-(\d{4})$/.exec(year);
-  if (span) return `${Number(span[1]) + 1}-${Number(span[2]) + 1}`;
+  if (span) return `${Number(span[1]) + step}-${Number(span[2]) + step}`;
   return null;
 }
 

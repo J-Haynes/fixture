@@ -197,7 +197,15 @@ async function queryDatabase({ from, to, leagueId, status }: FixturesQueryParams
 async function queryLeagues(): Promise<League[]> {
   const { db }                                       = await import('@/db');
   const { leagues, sports, seasons, fixtures, teams } = await import('@/db/schema');
-  const { eq, and, or, asc }                         = await import('drizzle-orm');
+  const { eq, and, or, asc, exists }                 = await import('drizzle-orm');
+
+  // Only leagues whose current season has fixtures: a freshly seeded league stays out of the
+  // menu until the sync imports it, and so does a competition between editions
+  const hasFixtures = db
+    .select({ id: fixtures.id })
+    .from(fixtures)
+    .innerJoin(seasons, eq(fixtures.seasonId, seasons.id))
+    .where(and(eq(seasons.leagueId, leagues.id), eq(seasons.isCurrent, true)));
 
   const rows = await db
     .select({
@@ -213,7 +221,7 @@ async function queryLeagues(): Promise<League[]> {
     })
     .from(leagues)
     .innerJoin(sports, eq(leagues.sportId, sports.id))
-    .where(eq(leagues.isActive, true))
+    .where(and(eq(leagues.isActive, true), exists(hasFixtures)))
     .orderBy(asc(sports.name), asc(leagues.name));
 
   // Teams come from fixtures, so a club in several competitions is listed under each one
