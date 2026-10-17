@@ -15,6 +15,8 @@ const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled'
 // the sync; hide it rather than show a stale kickoff time.
 const STALE_SCHEDULED_MS = 10 * 60 * 1000;
 
+const noopSubscribe = () => () => {};
+
 interface Props {
   fixtures: Fixture[];
   /** When the (cached) server render happened — used as "now" during hydration */
@@ -27,6 +29,10 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
   // markup) and then switch to the real clock, ticking once a minute.
   const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
   const { hiddenLeagues } = usePreferences();
+  // The server can't know the viewer's timezone, so the server render and hydration group
+  // fixtures by UTC day (a deterministic match); the client then regroups by local day.
+  // Grouping by local day straight away changes the markup and breaks hydration.
+  const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   const grouped = useMemo(() => {
     const cutoff = now - STALE_SCHEDULED_MS;
@@ -42,13 +48,13 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
 
     const map = new Map<string, Fixture[]>();
     for (const f of filtered) {
-      const key = toLocalDateKey(f.scheduledAt);
+      const key = isClient ? toLocalDateKey(f.scheduledAt) : f.scheduledAt.slice(0, 10);
       const bucket = map.get(key) ?? [];
       bucket.push(f);
       map.set(key, bucket);
     }
     return Array.from(map.entries());
-  }, [fixtures, view, now, hiddenLeagues]);
+  }, [fixtures, view, now, hiddenLeagues, isClient]);
 
   return (
     <>

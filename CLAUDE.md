@@ -93,7 +93,9 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
 - **[src/components/fixtures/FixtureFeed.tsx](src/components/fixtures/FixtureFeed.tsx)**: the only stateful client
   component (tab switch, local-date grouping). It hides `scheduled` fixtures more than 10 minutes past kickoff. "Now"
   comes from `useSyncExternalStore`, which uses the server's `renderedAt` during hydration and then a once-a-minute
-  clock, so cached HTML still hydrates cleanly. There is no client polling: data refreshes only on reload. Any polling
+  clock, so cached HTML still hydrates cleanly. For the same reason it groups by **UTC** day during the server render
+  and hydration (`isClient` false), then regroups by local day. Grouping by local day in the first render breaks
+  hydration (React #418) whenever UTC and local dates differ. There is no client polling: data refreshes only on reload. Any polling
   added later must hit cached data.
 - **[src/components/fixtures/FixtureCard.tsx](src/components/fixtures/FixtureCard.tsx)**: per-league banner colours
   come from `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts), shared with the menu. Uses `TeamMatchLayout` when both teams exist, otherwise `EventLayout`
@@ -105,7 +107,8 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   (hamburger + left drawer, portalled to `<body>`; empty apart from a placeholder Settings button), the centred logo,
   and `HeaderClock` (today's date/time, rendered only on the client). The minute clock lives in
   [src/lib/clock.ts](src/lib/clock.ts) and is shared with `FixtureFeed`.
-- **League filter:** the drawer's `LeagueFilterList` toggles leagues (with a placeholder "teams" button per league).
+- **League filter:** the drawer's `LeagueFilterList` toggles a league by tapping its row (no switch; a hidden league is
+  greyed out). Each row's chevron expands a placeholder panel for future per-team filtering.
   The leagues come from `getCachedLeagues` (active leagues, same cache tag). Choices live in `localStorage`
   (`fixture:prefs`, read by `usePreferences()` in [src/lib/preferences.ts](src/lib/preferences.ts)), and
   `FixtureFeed` filters on the client. Hidden leagues are stored rather than shown ones, so new leagues appear by

@@ -116,17 +116,21 @@ interface CentreProps {
 
 function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProps) {
   switch (status) {
-    case 'finished':
+    case 'finished': {
+      // The losing side's score is dimmed so the winner stands out; a draw keeps both white
+      const homeLost = homeScore != null && awayScore != null && homeScore < awayScore;
+      const awayLost = homeScore != null && awayScore != null && awayScore < homeScore;
       return (
         <>
           <div className="flex items-center gap-1.5">
-            <span className="text-2xl font-bold text-white tabular-nums">{homeScore}</span>
+            <span className={`text-2xl font-bold tabular-nums ${homeLost ? 'text-zinc-400' : 'text-white'}`}>{homeScore}</span>
             <span className="text-zinc-600 text-lg">–</span>
-            <span className="text-2xl font-bold text-white tabular-nums">{awayScore}</span>
+            <span className={`text-2xl font-bold tabular-nums ${awayLost ? 'text-zinc-400' : 'text-white'}`}>{awayScore}</span>
           </div>
           <StatusBadge status="finished" />
         </>
       );
+    }
     case 'live':
       return (
         <>
