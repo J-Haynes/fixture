@@ -28,6 +28,11 @@ over to the next year by itself. All are `2026` as of Oct 2026; the World Cup is
 | `afl` | AFL | 4456 | team vs team (`afl-*` slugs, season `2026` until 2027 is published) |
 | `a-league-men` | A-League Men | 4356 | team vs team (`alm-*` slugs, season `2026-2027`) |
 | `premier-league` | Premier League | 4328 | team vs team (`epl-*` slugs, season `2026-2027`) |
+| `champions-league` | UEFA Champions League | 4480 | team vs team (league phase onward; July–Aug qualifiers filtered out). Reuses existing clubs (e.g. `epl-arsenal`); other clubs are `club-*` |
+
+**Teams are shared across competitions.** TheSportsDB uses one `idTeam` per club, and the sync resolves teams by
+that ID first, so Arsenal's Premier League and Champions League fixtures point at the same `teams` row. When
+adding a competition, seed only the clubs we don't have yet; slugs keep their original prefix.
 
 ## Tech stack
 
@@ -108,8 +113,14 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   (hamburger + left drawer, portalled to `<body>`; empty apart from a placeholder Settings button), the centred logo,
   and `HeaderClock` (today's date/time, rendered only on the client). The minute clock lives in
   [src/lib/clock.ts](src/lib/clock.ts) and is shared with `FixtureFeed`.
-- **League filter:** the drawer's `LeagueFilterList` toggles a league by tapping its row (no switch; a hidden league is
-  greyed out). Each row's chevron expands a placeholder panel for future per-team filtering.
+- **Filters (menu):** `LeagueFilterList` has a **My teams** section (followed teams, shown in every competition they
+  play in) and the league list. Tapping a league row toggles it (a hidden league is greyed out). The chevron (team
+  sports only) expands an **All games / My teams only** toggle and the league's teams with follow stars.
+  `isFixtureVisible` in [src/lib/preferences.ts](src/lib/preferences.ts) is the single rule: a hidden league shows
+  nothing; a "mine" league shows only fixtures with a followed team (motorsport is exempt). The Champions League
+  defaults to "mine" (`MY_TEAMS_BY_DEFAULT`). Prefs are `v: 2` (`hiddenLeagues`, `followedTeams` as team slugs,
+  `leagueModes`) and `v: 1` is migrated on read. The menu's team lists come from each league's current-season
+  fixtures (`getCachedLeagues`).
   The leagues come from `getCachedLeagues` (active leagues, same cache tag). Choices live in `localStorage`
   (`fixture:prefs`, read by `usePreferences()` in [src/lib/preferences.ts](src/lib/preferences.ts)), and
   `FixtureFeed` filters on the client. Hidden leagues are stored rather than shown ones, so new leagues appear by
@@ -139,7 +150,9 @@ The sync is built to make as few API calls and DB writes as possible. Each run:
    while `eventsday.php` is fresh. Then load that **season's** existing fixtures keyed by provider event ID.
 4. For each event: resolve teams (external ID first, then fuzzy `findTeamByName` limited to the league's sport,
    saving any new mapping). Rounds come from `roundLabel` (TheSportsDB codes: 0 = Opening Round, 500 = Pre-season,
-   200 = Final, other 100+ values = Finals). **Only
+   200 = Final, other 100+ values = Finals; a league can override this with `LeagueConfig.roundLabel`). Status codes
+   follow API-Football: `FT`/`AET`/`PEN` are finished; `ET`/`BT`/`P` are extra time, the break before it and a
+   shoot-out in progress. **Only
    columns that differ are UPDATEd**, so most runs write nothing. New events are INSERTed, along with an upserted
    `external_ids` row.
 5. Podium (`fetchResults` leagues): for finished events without `sportMeta.podium`, call `eventresults.php`. Empty
@@ -231,7 +244,8 @@ uses it plus `public/icon-{192,512}.png` and `icon-maskable-512.png`, made by `n
   config-like code. Match the surrounding style.
 - Store times in UTC and render them in local time. Never format dates on the server.
 - Static assets: league logos in `public/logos/`, Super Rugby teams in `public/rugby/`, NRL teams in
-  `public/rugbyleague/`, AFL in `public/afl/`, A-League Men in `public/aleague/`, Premier League in `public/epl/`, World Cup flags in `public/country/<iso>.svg`. Team avatars use `next/image` with
+  `public/rugbyleague/`, AFL in `public/afl/`, A-League Men in `public/aleague/`, Premier League in `public/epl/`,
+  other clubs (Champions League) in `public/clubs/`, World Cup flags in `public/country/<iso>.svg`. Team avatars use `next/image` with
   `unoptimized`, and league logos use plain `<img>`. Neither goes through Vercel Image Optimization, so **resize
   PNG/JPG logos to at most 144 px before committing** (3× the largest 48 px display size).
 - [next.config.ts](next.config.ts) sets a strict CSP (`img-src 'self' data: blob:`, `connect-src 'self'`). Remote

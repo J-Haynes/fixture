@@ -15,6 +15,8 @@ export interface League {
   slug: string;
   country?: string;
   logoUrl?: string;
+  /** Current-season teams; only filled in for the menu's league list */
+  teams?: Team[];
 }
 
 export interface Team {

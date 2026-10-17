@@ -12,6 +12,7 @@ const COLOURS = [
 ];
 
 const SIZE_MAP = {
+  xs: { px: 24, cls: 'w-6 h-6 text-[8px]'   },
   sm: { px: 32, cls: 'w-8 h-8 text-[10px]' },
   md: { px: 40, cls: 'w-10 h-10 text-xs'   },
   lg: { px: 48, cls: 'w-[48px] h-[48px] text-xs' },

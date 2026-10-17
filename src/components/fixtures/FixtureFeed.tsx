@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Fixture } from '@/lib/types';
 import { toLocalDateKey } from '@/lib/dates';
 import { subscribeClock, getClock } from '@/lib/clock';
-import { usePreferences, showAllLeagues } from '@/lib/preferences';
+import { usePreferences, showAllLeagues, isFixtureVisible } from '@/lib/preferences';
 import { DateGroup } from './DateGroup';
 
 type View = 'upcoming' | 'results';
@@ -35,7 +35,7 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
   // The page HTML is cached, so hydrate with the render time (matching the server
   // markup) and then switch to the real clock, ticking once a minute.
   const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
-  const { hiddenLeagues } = usePreferences();
+  const prefs = usePreferences();
   // The server can't know the viewer's timezone, so the server render and hydration group
   // fixtures by UTC day (a deterministic match); the client then regroups by local day.
   // Grouping by local day straight away changes the markup and breaks hydration.
@@ -64,17 +64,15 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
     };
   }, [inPlay, renderedAt, router]);
 
-  const grouped = useMemo(() => {
+  const { grouped, filteredOut } = useMemo(() => {
     const cutoff = now - STALE_SCHEDULED_MS;
-    const hidden = new Set(hiddenLeagues);
-    const current = fixtures.filter(
-      f => !hidden.has(f.league.slug) && (f.status !== 'scheduled' || Date.parse(f.scheduledAt) >= cutoff)
-    );
+    const current = fixtures.filter(f => f.status !== 'scheduled' || Date.parse(f.scheduledAt) >= cutoff);
 
-    const filtered =
+    const inView =
       view === 'upcoming'
         ? current.filter(f => UPCOMING_STATUSES.has(f.status))
         : [...current.filter(f => f.status === 'finished')].reverse();
+    const filtered = inView.filter(f => isFixtureVisible(f, prefs));
 
     const map = new Map<string, Fixture[]>();
     for (const f of filtered) {
@@ -83,8 +81,8 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
       bucket.push(f);
       map.set(key, bucket);
     }
-    return Array.from(map.entries());
-  }, [fixtures, view, now, hiddenLeagues, isClient]);
+    return { grouped: Array.from(map.entries()), filteredOut: inView.length - filtered.length };
+  }, [fixtures, view, now, prefs, isClient]);
 
   return (
     <>
@@ -96,7 +94,12 @@ export function FixtureFeed({ fixtures, renderedAt }: Props) {
             <p className="font-medium text-zinc-500">
               {view === 'upcoming' ? 'No upcoming fixtures' : 'No recent results'}
             </p>
-            {hiddenLeagues.length > 0 && (
+            {filteredOut > 0 && (
+              <p className="mt-2 text-sm text-zinc-600">
+                Your filters are hiding {filteredOut} {filteredOut === 1 ? 'fixture' : 'fixtures'}. Change them in the menu.
+              </p>
+            )}
+            {prefs.hiddenLeagues.length > 0 && (
               <button
                 type="button"
                 onClick={showAllLeagues}

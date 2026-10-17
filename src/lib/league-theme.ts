@@ -15,6 +15,7 @@ const LEAGUE_BANNER: Record<string, LeagueBanner> = {
   'v8-supercars':        { strip: 'bg-gradient-to-r from-zinc-950 to-orange-900',  divider: 'border-orange-800/50',  text: 'text-white/85' },
   'afl':                 { strip: 'bg-gradient-to-r from-blue-950 to-red-800',     divider: 'border-red-800/50',     text: 'text-white/85' },
   'a-league-men':        { strip: 'bg-gradient-to-r from-zinc-950 to-rose-700',    divider: 'border-rose-800/50',    text: 'text-white/85' },
+  'champions-league':    { strip: 'bg-gradient-to-r from-slate-950 to-blue-800',  divider: 'border-blue-800/50',    text: 'text-white/85' },
   'premier-league':      { strip: 'bg-gradient-to-r from-purple-950 to-fuchsia-800', divider: 'border-fuchsia-800/50', text: 'text-white/85' },
 };
 

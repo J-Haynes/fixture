@@ -16,7 +16,12 @@ interface LeagueConfig {
   eventNameAsLabel?:    boolean;
   /** Drop events that don't pass this filter (e.g. practice sessions) */
   sessionFilter?:       (event: TsdbEvent) => boolean;
+  /** League-specific round label, replacing the generic roundLabel(intRound) */
+  roundLabel?:          (event: TsdbEvent) => string | null;
 }
+
+/** Champions League qualifiers and play-offs run in July–August; the league phase starts in September */
+const isUclQualifier = (e: TsdbEvent) => [7, 8].includes(Number(e.strTimestamp.slice(5, 7)));
 
 // Provider config, keyed by league slug. Which season gets synced comes from the DB
 // (seasons.is_current + leagues.is_active), so no code change is needed between seasons.
@@ -27,6 +32,18 @@ const LEAGUE_CONFIG: Record<string, LeagueConfig> = {
   'afl':                 { apiId: '4456', maxGameDurationHours: 3.5 },
   'a-league-men':        { apiId: '4356', maxGameDurationHours: 2.5 },
   'premier-league':      { apiId: '4328', maxGameDurationHours: 2.5 },
+  'champions-league': {
+    apiId: '4480',
+    maxGameDurationHours: 3, // extra time and penalties in the knockouts
+    // Qualifiers share intRound 1–3 with the league phase and are mostly clubs we don't carry
+    sessionFilter: e => !isUclQualifier(e),
+    roundLabel: e => {
+      const n = Number(e.intRound);
+      if (n === 200) return 'Final';
+      if (n >= 100)  return 'Knockouts';
+      return n > 0 ? `League phase · MD ${n}` : null;
+    },
+  },
   'formula-1': {
     apiId: '4370',
     maxGameDurationHours: 4,
@@ -133,11 +150,14 @@ function isDue(activity: SeasonActivity, config: LeagueConfig, now: number): boo
 
 // ── Status mapping ────────────────────────────────────────────────────────────
 
-const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'PEN', 'Break', 'Live', 'Q1', 'Q2', 'Q3', 'Q4']);
+// TheSportsDB follows API-Football's codes: AET/PEN are *finished* after extra time or a
+// shoot-out, while ET/BT/P are extra time, the break before it, and a shoot-out in progress.
+const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN']);
+const LIVE_STATUSES     = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'Break', 'Live', 'Q1', 'Q2', 'Q3', 'Q4']);
 
 function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatus {
   if (event.strPostponed === 'yes')        return 'postponed';
-  if (event.strStatus === 'FT')            return 'finished';
+  if (FINISHED_STATUSES.has(event.strStatus)) return 'finished';
   if (LIVE_STATUSES.has(event.strStatus))  return 'live';
 
   const kickoff = new Date(event.strTimestamp + 'Z');
@@ -366,7 +386,7 @@ async function syncLeague(
     // For team sports: round = named round or "Round N"
     const round = eventNameAsLabel
       ? (event.strRound ?? null)
-      : (event.strRound || roundLabel(event.intRound));
+      : (event.strRound || (config.roundLabel ? config.roundLabel(event) : roundLabel(event.intRound)));
 
     const existing = existingByExtId.get(event.idEvent);
     let fixtureId: number;
