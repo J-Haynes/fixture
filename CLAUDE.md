@@ -15,7 +15,8 @@ cancelled) and a **Results** tab (finished, newest first), grouped by day in the
 shown is today ±14 days.
 
 Leagues with provider config in `LEAGUE_CONFIG` ([src/lib/sync/sync-fixtures.ts](src/lib/sync/sync-fixtures.ts)).
-The season that gets synced comes from the DB (`seasons.is_current` + `leagues.is_active`); all are `2026` today:
+The season that gets synced comes from the DB (`seasons.is_current` + `leagues.is_active`), and the sync rolls it
+over to the next year by itself. All are `2026` as of Oct 2026; the World Cup is inactive (finished, next in 2030):
 
 | Slug | League | TheSportsDB id | Kind |
 |---|---|---|---|
@@ -47,7 +48,8 @@ npm run start        # serve the build
 npm run lint         # eslint (next core-web-vitals + typescript)
 npm run typecheck    # tsc --noEmit
 npm run db:push      # drizzle-kit push schema to DATABASE_URL (no migration files are kept)
-npm run db:seed      # seed sports/leagues/seasons/teams (idempotent)
+npm run db:seed      # seed sports/leagues/first seasons/teams (idempotent; never changes an existing current season)
+npm run season       # list seasons; `-- roll <league> <year>`, `-- deactivate|activate <league>`
 npm run db:studio    # drizzle studio
 npm run sync         # hit /api/cron/sync on localhost with CRON_SECRET (needs dev server + jq); only due leagues
 npm run sync:all     # same with ?force — sync every current season regardless of cadence
@@ -125,10 +127,15 @@ The sync is built to make as few API calls and DB writes as possible. Each run:
    `external_ids` row.
 5. Podium (`fetchResults` leagues): for finished events without `sportMeta.podium`, call `eventresults.php`. Empty
    results set `sportMeta.podiumCheckedAt`; the call is retried every 30 min and abandoned 3 days after the event.
-6. `seasons.last_synced_at` is set for each league that syncs successfully. A failing league doesn't block the
+6. **Season rollover:** if a synced season's last fixture was more than 7 days ago, ask the provider for the next
+   season (`nextSeasonYear`: `2026` → `2027`, `2025-2026` → `2026-2027`). If it has events, `setCurrentSeason`
+   ([src/lib/sync/seasons.ts](src/lib/sync/seasons.ts)) makes it the league's only current season, and the next
+   cron run imports it. That's one extra API call per finished league per day. Rollovers show in `rolled` and in a
+   `sync_log` row with `entity_type = 'seasons'`.
+7. `seasons.last_synced_at` is set for each league that syncs successfully. A failing league doesn't block the
    others; its error is returned in `errors` and the route responds 500.
-7. `sync_log` gets a row only when something changed or errored. Rows older than 30 days are pruned.
-8. The route calls `revalidateTag(FIXTURES_CACHE_TAG, { expire: 0 })` when `changed > 0`.
+8. `sync_log` gets a row only when something changed or errored. Rows older than 30 days are pruned.
+9. The route calls `revalidateTag(FIXTURES_CACHE_TAG, { expire: 0 })` when `changed > 0`.
 
 Because the sync only writes changed rows and revalidates only on change, **any new field shown in the UI must be
 part of the change comparison in `syncLeague`**. Otherwise updates to it won't reach the cached page.
@@ -138,8 +145,9 @@ part of the change comparison in `syncLeague`**. Otherwise updates to it won't r
 
 **Adding a league:** add the sport/league/season (and teams for team sports) to [src/db/seed.ts](src/db/seed.ts) and
 run `db:seed`. Add an entry to `LEAGUE_CONFIG`, a banner in `LEAGUE_BANNER`, and logos under `public/` (PNGs pre-sized
-to at most 144 px; see below). Update the table above. **New season:** seed a season row with `is_current = true`
-and set the old one to `false`. No code change is needed.
+to at most 144 px; see below). Update the table above. **New season:** automatic (step 6). To force one, or to start a season before the old one
+has finished, run `npm run season -- roll <league> <year>`. Nothing in the code changes. `db:seed` only creates a
+league's *first* season and inserts no fixtures.
 
 ## Database schema ([src/db/schema/](src/db/schema/))
 
@@ -167,7 +175,7 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
 | Route | Purpose |
 |---|---|
 | `GET /` | The app |
-| `GET /api/cron/sync[?force]` | Runs the sync. Requires `Authorization: Bearer $CRON_SECRET`. Returns `{ ok, synced, skipped, processed, changed, errors }`. |
+| `GET /api/cron/sync[?force]` | Runs the sync. Requires `Authorization: Bearer $CRON_SECRET`. Returns `{ ok, synced, skipped, processed, changed, rolled, errors }`. |
 | `/icon.svg`, `/apple-icon.png`, `/favicon.ico` | File-based metadata icons in `src/app/` (don't also put `icon.svg` in `public/`; the paths would clash) |
 
 ## External integrations

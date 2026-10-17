@@ -2,6 +2,7 @@ import { eq, and, lt, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { fixtures, teams, seasons, leagues, externalIds, syncLog } from '@/db/schema';
 import { fetchSeasonEvents, fetchEventResults, type TsdbEvent } from './thesportsdb';
+import { nextSeasonYear, setCurrentSeason } from './seasons';
 import type { FixtureStatus } from '@/lib/types';
 
 const PROVIDER = 'thesportsdb';
@@ -63,8 +64,12 @@ const PODIUM_GIVE_UP_MS = 3 * 24 * HOUR;
 
 const SYNC_LOG_RETENTION_MS = 30 * 24 * HOUR;
 
+/** A season counts as over once its last fixture is this far in the past */
+const SEASON_OVER_AFTER_MS = 7 * 24 * HOUR;
+
 interface SeasonActivity {
   seasonId:            number;
+  leagueId:            number;
   year:                string;
   lastSyncedAt:        Date | null;
   slug:                string;
@@ -72,12 +77,14 @@ interface SeasonActivity {
   open:                number;
   matchday:            number;
   latestOpenKickoffMs: number | null;
+  lastKickoffMs:       number | null;
 }
 
 async function loadSeasonActivity(): Promise<SeasonActivity[]> {
   return db
     .select({
       seasonId:     seasons.id,
+      leagueId:     seasons.leagueId,
       year:         seasons.year,
       lastSyncedAt: seasons.lastSyncedAt,
       slug:         leagues.slug,
@@ -90,6 +97,7 @@ async function loadSeasonActivity(): Promise<SeasonActivity[]> {
       latestOpenKickoffMs: sql<number | null>`extract(epoch from max(${fixtures.scheduledAt}) filter (
         where ${fixtures.status} in ('scheduled', 'live')
           and ${fixtures.scheduledAt} <= now() + interval '15 minutes')) * 1000`.mapWith(Number),
+      lastKickoffMs: sql<number | null>`extract(epoch from max(${fixtures.scheduledAt})) * 1000`.mapWith(Number),
     })
     .from(seasons)
     .innerJoin(leagues, eq(seasons.leagueId, leagues.id))
@@ -371,6 +379,28 @@ async function syncLeague(
   return { processed: events.length, changed };
 }
 
+// ── Season rollover ───────────────────────────────────────────────────────────
+// Once a season is over, each sync of it also asks the provider for the next one
+// (one extra call, at the off-season cadence). When the next season has events,
+// it becomes the current season and the following cron run imports it.
+
+function seasonIsOver(season: SeasonActivity, now: number): boolean {
+  return season.lastKickoffMs != null && season.lastKickoffMs < now - SEASON_OVER_AFTER_MS;
+}
+
+/** Returns the new season's year if the league was rolled over */
+async function rollSeasonIfAvailable(season: SeasonActivity, config: LeagueConfig): Promise<string | null> {
+  const next = nextSeasonYear(season.year);
+  if (!next) return null;
+
+  let events = await fetchSeasonEvents(config.apiId, next);
+  if (config.sessionFilter) events = events.filter(config.sessionFilter);
+  if (events.length === 0) return null;
+
+  await setCurrentSeason(season.leagueId, next);
+  return next;
+}
+
 // ── Public entry point ────────────────────────────────────────────────────────
 
 export interface SyncResult {
@@ -382,11 +412,16 @@ export interface SyncResult {
   processed: number;
   /** Fixtures inserted or updated (drives cache revalidation) */
   changed:   number;
+  /** Leagues moved to their next season this run, e.g. "nrl → 2027" */
+  rolled:    string[];
   errors:    string[];
 }
 
-async function writeSyncLog(entry: Pick<typeof syncLog.$inferInsert, 'status' | 'recordsUpserted' | 'errorMessage'>) {
-  await db.insert(syncLog).values({ provider: PROVIDER, entityType: 'fixtures', ...entry });
+async function writeSyncLog(
+  entry: Pick<typeof syncLog.$inferInsert, 'status' | 'recordsUpserted' | 'errorMessage'>,
+  entityType = 'fixtures',
+) {
+  await db.insert(syncLog).values({ provider: PROVIDER, entityType, ...entry });
   await db.delete(syncLog).where(lt(syncLog.ranAt, new Date(Date.now() - SYNC_LOG_RETENTION_MS)));
 }
 
@@ -396,7 +431,7 @@ async function writeSyncLog(entry: Pick<typeof syncLog.$inferInsert, 'status' | 
  */
 export async function syncFixtures({ force = false } = {}): Promise<SyncResult> {
   const startedAt = Date.now();
-  const result: SyncResult = { synced: [], skipped: 0, processed: 0, changed: 0, errors: [] };
+  const result: SyncResult = { synced: [], skipped: 0, processed: 0, changed: 0, rolled: [], errors: [] };
 
   try {
     const activity = await loadSeasonActivity();
@@ -419,6 +454,11 @@ export async function syncFixtures({ force = false } = {}): Promise<SyncResult> 
           result.synced.push(season.slug);
           result.processed += processed;
           result.changed   += changed;
+
+          if (seasonIsOver(season, startedAt)) {
+            const next = await rollSeasonIfAvailable(season, LEAGUE_CONFIG[season.slug]);
+            if (next) result.rolled.push(`${season.slug} → ${next}`);
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.error(`[sync:${season.slug}] Error:`, message);
@@ -440,6 +480,13 @@ export async function syncFixtures({ force = false } = {}): Promise<SyncResult> 
   } else if (result.changed > 0) {
     await writeSyncLog({ status: 'success', recordsUpserted: result.changed });
   }
+  if (result.rolled.length > 0) {
+    // error_message doubles as the message column here
+    await writeSyncLog(
+      { status: 'success', recordsUpserted: result.rolled.length, errorMessage: `Rolled over: ${result.rolled.join(', ')}` },
+      'seasons',
+    ).catch(() => {});
+  }
 
   if (result.synced.length > 0) {
     console.log(
@@ -447,6 +494,7 @@ export async function syncFixtures({ force = false } = {}): Promise<SyncResult> 
       `${result.changed} changed in ${Date.now() - startedAt}ms`
     );
   }
+  if (result.rolled.length > 0) console.log(`[sync] New season: ${result.rolled.join(', ')}`);
 
   return result;
 }

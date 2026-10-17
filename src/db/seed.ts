@@ -1,12 +1,29 @@
 /**
- * Seeds the database with Super Rugby Pacific 2026 + NRL 2026 data.
+ * Seeds sports, leagues, each league's first season, and teams. Fixtures come from
+ * the sync, which also rolls seasons over (or use `npm run season`).
  * Run with: npm run db:seed
  *
- * Idempotent — safe to run multiple times. Skips fixture insert if data exists.
+ * Idempotent — safe to run multiple times.
  */
-import { eq, count } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from './index';
-import { sports, leagues, seasons, teams, fixtures } from './schema';
+import { sports, leagues, seasons, teams } from './schema';
+import { setCurrentSeason } from '@/lib/sync/seasons';
+
+/**
+ * Gives a league its first current season. A league that already has a current season
+ * is left alone, so re-seeding never undoes a rollover. Returns the current year.
+ */
+async function ensureSeason(leagueId: number, year: string): Promise<string> {
+  const [current] = await db
+    .select({ year: seasons.year })
+    .from(seasons)
+    .where(and(eq(seasons.leagueId, leagueId), eq(seasons.isCurrent, true)));
+  if (current) return current.year;
+
+  await setCurrentSeason(leagueId, year);
+  return year;
+}
 
 async function main() {
   console.log('🌱 Seeding database...\n');
@@ -40,15 +57,7 @@ async function main() {
     .returning();
   console.log(`✓ League: ${superRugby.name} (id ${superRugby.id})`);
 
-  const [srpSeason] = await db
-    .insert(seasons)
-    .values({ leagueId: superRugby.id, year: '2026', isCurrent: true })
-    .onConflictDoUpdate({
-      target: [seasons.leagueId, seasons.year],
-      set: { isCurrent: true },
-    })
-    .returning();
-  console.log(`✓ Season: SRP ${srpSeason.year} (id ${srpSeason.id})`);
+  console.log(`✓ Season: SRP ${await ensureSeason(superRugby.id, '2026')} (current)`);
 
   const srpTeams = [
     { sportId: rugbyUnion.id, name: 'Blues',           shortName: 'BLU', slug: 'blues',          country: 'New Zealand', logoUrl: '/rugby/blues.png'        },
@@ -67,47 +76,7 @@ async function main() {
   await db.insert(teams).values(srpTeams)
     .onConflictDoUpdate({ target: teams.slug, set: { name: teams.name } });
   console.log(`✓ Teams: ${srpTeams.length} SRP teams upserted`);
-
-  const [{ srpCount }] = await db
-    .select({ srpCount: count() })
-    .from(fixtures)
-    .where(eq(fixtures.seasonId, srpSeason.id));
-
-  if (srpCount > 0) {
-    console.log(`  ↳ Fixtures exist (${srpCount} rows) — skipping SRP fixture seed`);
-  } else {
-    const allSrpTeams = await db.select().from(teams).where(eq(teams.sportId, rugbyUnion.id));
-    const bySlug = Object.fromEntries(allSrpTeams.map(t => [t.slug, t.id]));
-
-    const fixtureData = [
-      // Round 14 · Fri 22 – Sat 23 May 2026 (finished)
-      { seasonId: srpSeason.id, homeTeamId: bySlug['blues'],         awayTeamId: bySlug['crusaders'],     scheduledAt: new Date('2026-05-22T08:05:00Z'), status: 'finished', round: 'Round 14', homeScore: 28, awayScore: 21 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['hurricanes'],    awayTeamId: bySlug['chiefs'],        scheduledAt: new Date('2026-05-22T10:05:00Z'), status: 'finished', round: 'Round 14', homeScore: 15, awayScore: 24 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['brumbies'],      awayTeamId: bySlug['reds'],          scheduledAt: new Date('2026-05-23T07:45:00Z'), status: 'finished', round: 'Round 14', homeScore: 31, awayScore: 15 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['waratahs'],      awayTeamId: bySlug['fijian-drua'],   scheduledAt: new Date('2026-05-23T09:05:00Z'), status: 'finished', round: 'Round 14', homeScore: 22, awayScore: 19 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['force'],         awayTeamId: bySlug['highlanders'],   scheduledAt: new Date('2026-05-23T11:05:00Z'), status: 'finished', round: 'Round 14', homeScore: 14, awayScore: 27 },
-      // Round 15 · Fri 29 – Sat 30 May 2026 (finished)
-      { seasonId: srpSeason.id, homeTeamId: bySlug['crusaders'],     awayTeamId: bySlug['chiefs'],        scheduledAt: new Date('2026-05-29T08:05:00Z'), status: 'finished', round: 'Round 15', homeScore: 17, awayScore: 25 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['blues'],         awayTeamId: bySlug['hurricanes'],    scheduledAt: new Date('2026-05-29T10:05:00Z'), status: 'finished', round: 'Round 15', homeScore: 34, awayScore: 17 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['highlanders'],   awayTeamId: bySlug['reds'],          scheduledAt: new Date('2026-05-30T07:45:00Z'), status: 'finished', round: 'Round 15', homeScore: 22, awayScore: 15 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['moana-pasifika'],awayTeamId: bySlug['waratahs'],      scheduledAt: new Date('2026-05-30T07:45:00Z'), status: 'finished', round: 'Round 15', homeScore: 28, awayScore: 21 },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['fijian-drua'],   awayTeamId: bySlug['brumbies'],      scheduledAt: new Date('2026-05-30T09:05:00Z'), status: 'finished', round: 'Round 15', homeScore: 13, awayScore: 29 },
-      // Round 16 · Fri 5 – Sat 6 Jun 2026
-      { seasonId: srpSeason.id, homeTeamId: bySlug['chiefs'],        awayTeamId: bySlug['blues'],         scheduledAt: new Date('2026-06-05T08:05:00Z'), status: 'scheduled', round: 'Round 16' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['crusaders'],     awayTeamId: bySlug['hurricanes'],    scheduledAt: new Date('2026-06-05T10:05:00Z'), status: 'scheduled', round: 'Round 16' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['brumbies'],      awayTeamId: bySlug['highlanders'],   scheduledAt: new Date('2026-06-06T07:45:00Z'), status: 'scheduled', round: 'Round 16' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['reds'],          awayTeamId: bySlug['force'],         scheduledAt: new Date('2026-06-06T09:05:00Z'), status: 'scheduled', round: 'Round 16' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['waratahs'],      awayTeamId: bySlug['moana-pasifika'],scheduledAt: new Date('2026-06-06T09:05:00Z'), status: 'scheduled', round: 'Round 16' },
-      // Round 17 · Sat 13 Jun 2026
-      { seasonId: srpSeason.id, homeTeamId: bySlug['blues'],         awayTeamId: bySlug['brumbies'],      scheduledAt: new Date('2026-06-13T07:35:00Z'), status: 'scheduled', round: 'Round 17' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['hurricanes'],    awayTeamId: bySlug['highlanders'],   scheduledAt: new Date('2026-06-13T08:05:00Z'), status: 'scheduled', round: 'Round 17' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['chiefs'],        awayTeamId: bySlug['fijian-drua'],   scheduledAt: new Date('2026-06-13T10:05:00Z'), status: 'scheduled', round: 'Round 17' },
-      { seasonId: srpSeason.id, homeTeamId: bySlug['reds'],          awayTeamId: bySlug['waratahs'],      scheduledAt: new Date('2026-06-13T09:05:00Z'), status: 'scheduled', round: 'Round 17' },
-    ];
-
-    await db.insert(fixtures).values(fixtureData);
-    console.log(`✓ Fixtures: ${fixtureData.length} SRP fixtures inserted`);
-  }
+  console.log('  ↳ SRP fixtures will be populated by the sync cron (npm run sync)');
 
   // ══════════════════════════════════════════════════════════════════════════════
   // Rugby League — NRL 2026
@@ -138,15 +107,7 @@ async function main() {
     .returning();
   console.log(`✓ League: ${nrl.name} (id ${nrl.id})`);
 
-  const [nrlSeason] = await db
-    .insert(seasons)
-    .values({ leagueId: nrl.id, year: '2026', isCurrent: true })
-    .onConflictDoUpdate({
-      target: [seasons.leagueId, seasons.year],
-      set: { isCurrent: true },
-    })
-    .returning();
-  console.log(`✓ Season: NRL ${nrlSeason.year} (id ${nrlSeason.id})`);
+  console.log(`✓ Season: NRL ${await ensureSeason(nrl.id, '2026')} (current)`);
 
   const nrlTeams = [
     { sportId: rugbyLeague.id, name: 'Brisbane Broncos',           shortName: 'BRI', slug: 'broncos',   country: 'Australia',   logoUrl: '/rugbyleague/brisbanebroncos.svg'          },
@@ -202,14 +163,7 @@ async function main() {
     .returning();
   console.log(`✓ League: ${worldCup.name} (id ${worldCup.id})`);
 
-  await db
-    .insert(seasons)
-    .values({ leagueId: worldCup.id, year: '2026', isCurrent: true })
-    .onConflictDoUpdate({
-      target: [seasons.leagueId, seasons.year],
-      set: { isCurrent: true },
-    });
-  console.log(`✓ Season: World Cup 2026`);
+  console.log(`✓ Season: World Cup ${await ensureSeason(worldCup.id, '2026')} (current)`);
 
   // Country name → ISO 3166-1 alpha-2 code, matching TheSportsDB team names exactly.
   const COUNTRY_FLAG: Record<string, string> = {
@@ -305,14 +259,7 @@ async function main() {
     .returning();
   console.log(`✓ League: ${formulaOne.name} (id ${formulaOne.id})`);
 
-  await db
-    .insert(seasons)
-    .values({ leagueId: formulaOne.id, year: '2026', isCurrent: true })
-    .onConflictDoUpdate({
-      target: [seasons.leagueId, seasons.year],
-      set: { isCurrent: true },
-    });
-  console.log(`✓ Season: F1 2026`);
+  console.log(`✓ Season: F1 ${await ensureSeason(formulaOne.id, '2026')} (current)`);
 
   const [v8Supercars] = await db
     .insert(leagues)
@@ -331,14 +278,7 @@ async function main() {
     .returning();
   console.log(`✓ League: ${v8Supercars.name} (id ${v8Supercars.id})`);
 
-  await db
-    .insert(seasons)
-    .values({ leagueId: v8Supercars.id, year: '2026', isCurrent: true })
-    .onConflictDoUpdate({
-      target: [seasons.leagueId, seasons.year],
-      set: { isCurrent: true },
-    });
-  console.log(`✓ Season: V8 Supercars 2026`);
+  console.log(`✓ Season: V8 Supercars ${await ensureSeason(v8Supercars.id, '2026')} (current)`);
   console.log('  ↳ Motorsport fixtures will be populated by the sync cron (npm run sync)');
 
   console.log('\n✅ Seed complete.');
