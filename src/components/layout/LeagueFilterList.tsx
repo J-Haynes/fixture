@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { League, Team } from '@/lib/types';
 import { leagueBanner } from '@/lib/league-theme';
 import { getSportEmoji } from '@/lib/sports';
@@ -42,22 +42,7 @@ export function LeagueFilterList({ leagues }: Props) {
             Open a league below to follow teams. They show up in every competition they play in.
           </p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
-            {myTeams.map(team => (
-              <li key={team.slug}>
-                <button
-                  type="button"
-                  onClick={() => toggleTeam(team.slug)}
-                  aria-label={`Unfollow ${team.name}`}
-                  className="flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-800 py-1 pl-1 pr-2.5 text-xs font-medium text-zinc-200 hover:border-zinc-600"
-                >
-                  <TeamAvatar team={team} size="xs" />
-                  {team.name}
-                  <span aria-hidden="true" className="text-zinc-500">✕</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <MyTeamsList teams={myTeams} />
         )}
       </section>
 
@@ -166,6 +151,80 @@ export function LeagueFilterList({ leagues }: Props) {
           })}
         </ul>
       </section>
+    </>
+  );
+}
+
+const ROWS_SHOWN = 4;
+const CHIP_GAP_PX = 8; // gap-2
+
+/**
+ * Followed-team chips, capped at four rows. If they wrap onto a fifth row, half of it
+ * stays visible (so it's clear there's more) and a "Show all" button expands the list.
+ */
+function MyTeamsList({ teams }: { teams: Team[] }) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const [layout, setLayout] = useState<{ collapsedHeight: number; overflows: boolean } | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  // Rows depend on chip widths and the drawer width, so measure rather than count
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const observer = new ResizeObserver(() => {
+      const rowHeight = (list.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+      const rowsHeight = ROWS_SHOWN * rowHeight + (ROWS_SHOWN - 1) * CHIP_GAP_PX;
+      setLayout({
+        collapsedHeight: rowsHeight + CHIP_GAP_PX + rowHeight / 2,
+        overflows:       list.scrollHeight > rowsHeight + 1,
+      });
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [teams.length]);
+
+  const collapsed = layout?.overflows === true && !showAll;
+
+  return (
+    <>
+      <div className="relative">
+        <ul
+          ref={listRef}
+          id="my-teams-list"
+          className="flex flex-wrap gap-2 overflow-hidden"
+          style={collapsed ? { maxHeight: layout.collapsedHeight } : undefined}
+        >
+          {teams.map(team => (
+            <li key={team.slug}>
+              <button
+                type="button"
+                onClick={() => toggleTeam(team.slug)}
+                aria-label={`Unfollow ${team.name}`}
+                className="flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-800 py-1 pl-1 pr-2.5 text-xs font-medium text-zinc-200 hover:border-zinc-600"
+              >
+                <TeamAvatar team={team} size="xs" />
+                {team.name}
+                <span aria-hidden="true" className="text-zinc-500">✕</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {collapsed && (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-b from-transparent to-zinc-900" />
+        )}
+      </div>
+
+      {layout?.overflows && (
+        <button
+          type="button"
+          onClick={() => setShowAll(v => !v)}
+          aria-expanded={showAll}
+          aria-controls="my-teams-list"
+          className="mt-2 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+        >
+          {showAll ? 'Show less' : `Show all ${teams.length} teams`}
+        </button>
+      )}
     </>
   );
 }

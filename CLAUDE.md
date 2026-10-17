@@ -114,7 +114,7 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   and `HeaderClock` (today's date/time, rendered only on the client). The minute clock lives in
   [src/lib/clock.ts](src/lib/clock.ts) and is shared with `FixtureFeed`.
 - **Filters (menu):** `LeagueFilterList` has a **My teams** section (followed teams, shown in every competition they
-  play in) and the league list. Tapping a league row toggles it (a hidden league is greyed out). The chevron (team
+  play in; `MyTeamsList` caps it at four measured rows plus a half-visible fifth, with a Show all button) and the league list. Tapping a league row toggles it (a hidden league is greyed out). The chevron (team
   sports only) expands an **All games / My teams only** toggle and the league's teams with follow stars.
   `isFixtureVisible` in [src/lib/preferences.ts](src/lib/preferences.ts) is the single rule: a hidden league shows
   nothing; a "mine" league shows only fixtures with a followed team (motorsport is exempt). The Champions League
