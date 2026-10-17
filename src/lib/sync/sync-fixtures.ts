@@ -1,7 +1,7 @@
 import { eq, and, lt, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { fixtures, teams, seasons, leagues, externalIds, syncLog } from '@/db/schema';
-import { fetchSeasonEvents, fetchEventResults, type TsdbEvent } from './thesportsdb';
+import { fetchSeasonEvents, fetchDayEvents, fetchEventResults, type TsdbEvent } from './thesportsdb';
 import { nextSeasonYear, setCurrentSeason } from './seasons';
 import type { FixtureStatus } from '@/lib/types';
 
@@ -119,6 +119,10 @@ function syncInterval(activity: SeasonActivity, config: LeagueConfig, now: numbe
   if (activity.matchday > 0)                       return CADENCE.matchday;
   if (activity.open > 0 || activity.total === 0)   return CADENCE.inSeason;
   return CADENCE.offSeason;
+}
+
+function isLive(activity: SeasonActivity, config: LeagueConfig, now: number): boolean {
+  return syncInterval(activity, config, now) === CADENCE.live;
 }
 
 function isDue(activity: SeasonActivity, config: LeagueConfig, now: number): boolean {
@@ -280,10 +284,37 @@ async function syncPodium(
 
 // ── Per-league sync ───────────────────────────────────────────────────────────
 
+/**
+ * Overlays in-play fields from eventsday.php onto the (possibly stale) season list.
+ * Covers today and, for games that started before midnight UTC, the previous day.
+ */
+async function withLiveData(events: TsdbEvent[], config: LeagueConfig, now: number): Promise<TsdbEvent[]> {
+  const liveWindowMs = config.maxGameDurationHours * HOUR + LIVE_GRACE_MS;
+  const dates = [...new Set([now, now - liveWindowMs].map(t => new Date(t).toISOString().slice(0, 10)))];
+
+  const fresh = new Map<string, TsdbEvent>();
+  for (const date of dates) {
+    for (const e of await fetchDayEvents(config.apiId, date)) fresh.set(e.idEvent, e);
+  }
+
+  return events.map(e => {
+    const f = fresh.get(e.idEvent);
+    return f ? {
+      ...e,
+      strStatus:    f.strStatus,
+      strPostponed: f.strPostponed,
+      strTimestamp: f.strTimestamp,
+      intHomeScore: f.intHomeScore,
+      intAwayScore: f.intAwayScore,
+    } : e;
+  });
+}
+
 async function syncLeague(
   season: SeasonActivity,
   config: LeagueConfig,
   ctx:    SyncContext,
+  live:   boolean,
 ): Promise<{ processed: number; changed: number }> {
   const { seasonId, year, slug: leagueSlug } = season;
   const { apiId, maxGameDurationHours, fetchResults, eventNameAsLabel, sessionFilter } = config;
@@ -291,6 +322,7 @@ async function syncLeague(
 
   let events = await fetchSeasonEvents(apiId, year);
   if (sessionFilter) events = events.filter(sessionFilter);
+  if (live) events = await withLiveData(events, config, now);
 
   // Current DB state for this season, keyed by provider event ID, so unchanged rows can be skipped
   const existingRows = await db
@@ -470,7 +502,8 @@ export async function syncFixtures({ force = false } = {}): Promise<SyncResult> 
 
       for (const season of due) {
         try {
-          const { processed, changed } = await syncLeague(season, LEAGUE_CONFIG[season.slug], ctx);
+          const config = LEAGUE_CONFIG[season.slug];
+          const { processed, changed } = await syncLeague(season, config, ctx, isLive(season, config, startedAt));
           await db.update(seasons)
             .set({ lastSyncedAt: new Date() })
             .where(eq(seasons.id, season.seasonId));

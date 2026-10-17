@@ -95,8 +95,9 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   comes from `useSyncExternalStore`, which uses the server's `renderedAt` during hydration and then a once-a-minute
   clock, so cached HTML still hydrates cleanly. For the same reason it groups by **UTC** day during the server render
   and hydration (`isClient` false), then regroups by local day. Grouping by local day in the first render breaks
-  hydration (React #418) whenever UTC and local dates differ. There is no client polling: data refreshes only on reload. Any polling
-  added later must hit cached data.
+  hydration (React #418) whenever UTC and local dates differ. While any fixture is live (or past kickoff but still `scheduled`), it calls
+  `router.refresh()` every 2 min. It also refreshes when the tab or PWA comes back after more than 5 min. Both
+  re-request the ISR-cached route, never the DB; keep any future polling on cached data too.
 - **[src/components/fixtures/FixtureCard.tsx](src/components/fixtures/FixtureCard.tsx)**: per-league banner colours
   come from `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts), shared with the menu. Uses `TeamMatchLayout` when both teams exist, otherwise `EventLayout`
   (motorsport: event name + podium from `sportMeta`).
@@ -132,8 +133,10 @@ The sync is built to make as few API calls and DB writes as possible. Each run:
 
    If nothing is due, the run ends there: no API calls and no writes. `?force` skips this check.
 2. Teams and team mappings are loaded **once** per run (`loadContext`).
-3. For each due league: make one `eventsseason.php` call, apply `sessionFilter`, then load that **season's** existing
-   fixtures keyed by provider event ID.
+3. For each due league: make one `eventsseason.php` call and apply `sessionFilter`. In the **live** tier, also call
+   `eventsday.php` for today (and yesterday, for games that started before midnight UTC) and overlay its
+   status/scores (`withLiveData`): `eventsseason.php` is served from a TheSportsDB cache up to about 15 min stale,
+   while `eventsday.php` is fresh. Then load that **season's** existing fixtures keyed by provider event ID.
 4. For each event: resolve teams (external ID first, then fuzzy `findTeamByName` limited to the league's sport,
    saving any new mapping). Rounds come from `roundLabel` (TheSportsDB codes: 0 = Opening Round, 500 = Pre-season,
    200 = Final, other 100+ values = Finals). **Only
@@ -197,8 +200,8 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
 
 ## External integrations
 
-- **TheSportsDB v1** (`https://www.thesportsdb.com/api/v1/json/{key}/…`). Endpoints used: `eventsseason.php?id&s`
-  and `eventresults.php?id`. Timestamps are UTC without a `Z`, so the code appends `'Z'`. Status/score fields are
+- **TheSportsDB v1** (`https://www.thesportsdb.com/api/v1/json/{key}/…`). Endpoints used: `eventsseason.php?id&s`,
+  `eventsday.php?d&l` (live tier only) and `eventresults.php?id`. Timestamps are UTC without a `Z`, so the code appends `'Z'`. Status/score fields are
   strings and are often empty.
 - **Supabase Postgres**: use the pooler connection string; direct IPv6 connections fail from many networks.
 - **Scheduling**: Supabase `pg_cron` + `pg_net` call `GET /api/cron/sync` every 2 minutes
