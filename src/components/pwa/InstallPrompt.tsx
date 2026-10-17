@@ -59,7 +59,8 @@ export function InstallPrompt() {
       role="banner"
       aria-label="Install app"
     >
-      <span className="text-xl shrink-0" aria-hidden="true">🏉</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/icon.svg" alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg" />
 
       <p className="flex-1 text-sm text-zinc-200 leading-snug">
         {state === 'ios' ? (
