@@ -421,6 +421,47 @@ async function main() {
     logoUrl: '/logos/premier-league.png', season: '2026-2027', teams: eplTeams, logoDir: '/epl',
   });
 
+  // Clubs outside our domestic leagues. Clubs we already have (e.g. the Premier League sides)
+  // are matched by TheSportsDB ID, so one team row covers every competition it plays in.
+  const uclClubs: SeedTeam[] = [
+    { tsdbId: '133650', name: 'Borussia Dortmund',   shortName: 'DOR', slug: 'club-borussia-dortmund',   country: 'Germany'     },
+    { tsdbId: '133660', name: 'Stuttgart',           shortName: 'STU', slug: 'club-stuttgart',           country: 'Germany'     },
+    { tsdbId: '133664', name: 'Bayern Munich',       shortName: 'BAY', slug: 'club-bayern-munich',       country: 'Germany'     },
+    { tsdbId: '133670', name: 'Napoli',              shortName: 'NAP', slug: 'club-napoli',              country: 'Italy'       },
+    { tsdbId: '133681', name: 'Inter Milan',         shortName: 'INT', slug: 'club-inter-milan',         country: 'Italy'       },
+    { tsdbId: '133682', name: 'Roma',                shortName: 'ROM', slug: 'club-roma',                country: 'Italy'       },
+    { tsdbId: '133711', name: 'Lille',               shortName: 'LIL', slug: 'club-lille',               country: 'France'      },
+    { tsdbId: '133714', name: 'Paris Saint-Germain', shortName: 'PSG', slug: 'club-paris-saint-germain', country: 'France'      },
+    { tsdbId: '133722', name: 'Real Betis',          shortName: 'BET', slug: 'club-real-betis',          country: 'Spain'       },
+    { tsdbId: '133729', name: 'Atlético Madrid',     shortName: 'ATM', slug: 'club-atletico-madrid',     country: 'Spain'       },
+    { tsdbId: '133738', name: 'Real Madrid',         shortName: 'MAD', slug: 'club-real-madrid',         country: 'Spain'       },
+    { tsdbId: '133739', name: 'Barcelona',           shortName: 'FCB', slug: 'club-barcelona',           country: 'Spain'       },
+    { tsdbId: '133740', name: 'Villarreal',          shortName: 'VLR', slug: 'club-villarreal',          country: 'Spain'       },
+    { tsdbId: '133753', name: 'AEK Athens',          shortName: 'AEK', slug: 'club-aek-athens',          country: 'Greece'      },
+    { tsdbId: '133758', name: 'Feyenoord',           shortName: 'FEY', slug: 'club-feyenoord',           country: 'Netherlands' },
+    { tsdbId: '133768', name: 'PSV Eindhoven',       shortName: 'PSV', slug: 'club-psv-eindhoven',       country: 'Netherlands' },
+    { tsdbId: '133789', name: 'Club Brugge',         shortName: 'BRU', slug: 'club-club-brugge',         country: 'Belgium'     },
+    { tsdbId: '133804', name: 'Galatasaray',         shortName: 'GAL', slug: 'club-galatasaray',         country: 'Turkey'      },
+    { tsdbId: '133807', name: 'Fenerbahçe',          shortName: 'FEN', slug: 'club-fenerbahce',          country: 'Turkey'      },
+    { tsdbId: '133822', name: 'Lens',                shortName: 'LNS', slug: 'club-lens',                country: 'France'      },
+    { tsdbId: '134090', name: 'Slovan Bratislava',   shortName: 'SLB', slug: 'club-slovan-bratislava',   country: 'Slovakia'    },
+    { tsdbId: '134114', name: 'Porto',               shortName: 'POR', slug: 'club-porto',               country: 'Portugal'    },
+    { tsdbId: '134126', name: 'Shakhtar Donetsk',    shortName: 'SHK', slug: 'club-shakhtar-donetsk',    country: 'Ukraine'     },
+    { tsdbId: '134243', name: 'Como',                shortName: 'COM', slug: 'club-como',                country: 'Italy'       },
+    { tsdbId: '134570', name: 'Viking',              shortName: 'VIK', slug: 'club-viking',              country: 'Norway'      },
+    { tsdbId: '134695', name: 'RB Leipzig',          shortName: 'RBL', slug: 'club-rb-leipzig',          country: 'Germany'     },
+    { tsdbId: '135497', name: 'Bodø/Glimt',          shortName: 'BOD', slug: 'club-bodo-glimt',         country: 'Norway'      },
+    { tsdbId: '135708', name: 'Sporting CP',         shortName: 'SCP', slug: 'club-sporting-cp',         country: 'Portugal'    },
+    { tsdbId: '136036', name: 'Slavia Prague',       shortName: 'SLA', slug: 'club-slavia-prague',       country: 'Czechia'     },
+    { tsdbId: '137261', name: 'LASK',                shortName: 'LAS', slug: 'club-lask',                country: 'Austria'     },
+    { tsdbId: '138341', name: 'Sabah Baku',          shortName: 'SAB', slug: 'club-sabah-baku',          country: 'Azerbaijan'  },
+  ];
+
+  await seedTeamLeague({
+    sportId: football.id, slug: 'champions-league', name: 'UEFA Champions League', shortName: 'Champions League',
+    country: 'Europe', logoUrl: '/logos/champions-league.png', season: '2026-2027', teams: uclClubs, logoDir: '/clubs',
+  });
+
   console.log('\n✅ Seed complete.');
   process.exit(0);
 }
