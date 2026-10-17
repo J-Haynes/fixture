@@ -3,6 +3,7 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import type { Fixture } from '@/lib/types';
 import { toLocalDateKey } from '@/lib/dates';
+import { subscribeClock, getClock } from '@/lib/clock';
 import { DateGroup } from './DateGroup';
 
 type View = 'upcoming' | 'results';
@@ -12,17 +13,6 @@ const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled'
 // A scheduled game that kicked off over 10 minutes ago should have been marked live by
 // the sync; hide it rather than show a stale kickoff time.
 const STALE_SCHEDULED_MS = 10 * 60 * 1000;
-
-const CLOCK_TICK_MS = 60 * 1000;
-
-function subscribeClock(onTick: () => void) {
-  const id = setInterval(onTick, CLOCK_TICK_MS);
-  return () => clearInterval(id);
-}
-
-function getClock() {
-  return Math.floor(Date.now() / CLOCK_TICK_MS) * CLOCK_TICK_MS;
-}
 
 interface Props {
   fixtures: Fixture[];
