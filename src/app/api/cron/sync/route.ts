@@ -3,7 +3,8 @@ import { syncFixtures } from '@/lib/sync/sync-fixtures';
 import { FIXTURES_CACHE_TAG } from '@/lib/fixtures';
 
 export const dynamic = 'force-dynamic';
-// Upper bound for a forced full sync; also the Vercel Hobby limit
+// Upper bound for a forced full sync. Kept well under the 300 s Hobby/Pro default so a
+// stuck provider call fails fast instead of burning provisioned memory.
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
