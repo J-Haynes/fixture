@@ -104,7 +104,8 @@ Browser ◀── page.tsx (ISR, revalidate 3600) ◀── getCachedFixtures (u
   `router.refresh()` every 2 min. It also refreshes when the tab or PWA comes back after more than 5 min. Both
   re-request the ISR-cached route, never the DB; keep any future polling on cached data too.
 - **[src/components/fixtures/FixtureCard.tsx](src/components/fixtures/FixtureCard.tsx)**: per-league banner colours
-  come from `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts), shared with the menu. Uses `TeamMatchLayout` when both teams exist, otherwise `EventLayout`
+  come from `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts), shared with the menu. Uses `TeamMatchLayout` when both teams exist (followed teams get an emerald star badge on their logo, via
+  `usePreferences`), otherwise `EventLayout`
   (motorsport: event name + podium from `sportMeta`).
 - **[src/lib/fixtures.ts](src/lib/fixtures.ts)**: `getFixtures()`, the one read path (DB or mock), plus
   `getCachedFixtures` and `FIXTURES_CACHE_TAG`. It uses dynamic imports so the postgres client isn't loaded when
