@@ -1,9 +1,12 @@
-import type { Fixture } from '@/lib/types';
+'use client';
+
+import type { Fixture, Team } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
 import { leagueBanner } from '@/lib/league-theme';
+import { usePreferences } from '@/lib/preferences';
 
 interface Props {
   fixture: Fixture;
@@ -75,16 +78,11 @@ function TeamMatchLayout({ homeTeam, awayTeam, scheduledAt, status, homeScore, a
   const isFinished = status === 'finished' && homeScore != null && awayScore != null;
   const homeIsLoser = isFinished && homeScore! < awayScore!;
   const awayIsLoser = isFinished && awayScore! < homeScore!;
+  const { followedTeams } = usePreferences();
 
   return (
     <div className="flex items-center gap-2">
-      {/* Home team */}
-      <div className="flex-1 flex flex-col items-center gap-1.5">
-        <TeamAvatar team={homeTeam} size="lg" />
-        <span className={`text-xs font-semibold text-center leading-tight ${homeIsLoser ? 'text-zinc-500' : 'text-zinc-200'}`}>
-          {homeTeam.name}
-        </span>
-      </div>
+      <TeamSide team={homeTeam} isLoser={homeIsLoser} isFollowed={followedTeams.includes(homeTeam.slug)} />
 
       {/* Centre: score / time / status */}
       <div className="flex flex-col items-center gap-1.5 w-20 shrink-0">
@@ -96,13 +94,32 @@ function TeamMatchLayout({ homeTeam, awayTeam, scheduledAt, status, homeScore, a
         />
       </div>
 
-      {/* Away team */}
-      <div className="flex-1 flex flex-col items-center gap-1.5">
-        <TeamAvatar team={awayTeam} size="lg" />
-        <span className={`text-xs font-semibold text-center leading-tight ${awayIsLoser ? 'text-zinc-500' : 'text-zinc-200'}`}>
-          {awayTeam.name}
-        </span>
-      </div>
+      <TeamSide team={awayTeam} isLoser={awayIsLoser} isFollowed={followedTeams.includes(awayTeam.slug)} />
+    </div>
+  );
+}
+
+/** One side of a match. Followed teams get an emerald star badge on the logo's corner. */
+function TeamSide({ team, isLoser, isFollowed }: { team: Team; isLoser: boolean; isFollowed: boolean }) {
+  return (
+    <div className="flex-1 flex flex-col items-center gap-1.5">
+      <span className="relative">
+        <TeamAvatar team={team} size="lg" />
+        {isFollowed && (
+          <span
+            aria-hidden="true"
+            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-zinc-900"
+          >
+            <svg viewBox="0 0 24 24" className="h-3 w-3 text-white" fill="currentColor">
+              <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+            </svg>
+          </span>
+        )}
+      </span>
+      <span className={`text-xs font-semibold text-center leading-tight ${isLoser ? 'text-zinc-500' : 'text-zinc-200'}`}>
+        {team.name}
+        {isFollowed && <span className="sr-only"> (followed)</span>}
+      </span>
     </div>
   );
 }
