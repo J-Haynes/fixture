@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 1054 1054" width="1054" height="1054">
+  <!-- Rounded square background -->
+  <rect x="100" y="100" width="1054" height="1054" rx="200" fill="#0b0b12"/>
+
+  <!-- Slanted "F" -->
+  <path fill="#ffffff" d="
+    M 445 345
+    L 975 345
+    Q 1010 350 1000 382
+    L 977 447
+    Q 962 487 925 487
+    L 515 487
+    Q 505 487 500 500
+    Q 490 530 483 572
+    L 855 572
+    Q 880 576 873 600
+    L 848 663
+    Q 830 703 793 703
+    L 453 703
+    L 413 868
+    Q 403 908 370 913
+    L 240 936
+    L 357 420
+    Q 375 345 445 345 Z"/>
+
+  <!-- Calendar binder rings (dark stroke cuts the notch into the bar) -->
+  <g fill="#0b0b12">
+    <rect x="484" y="265" width="102" height="153" rx="51"/>
+    <rect x="747" y="265" width="102" height="153" rx="51"/>
+  </g>
+  <g fill="#ffffff">
+    <rect x="507" y="288" width="56" height="107" rx="28"/>
+    <rect x="770" y="288" width="56" height="107" rx="28"/>
+  </g>
+</svg>
