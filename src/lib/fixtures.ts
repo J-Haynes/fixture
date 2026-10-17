@@ -1,5 +1,5 @@
 import { unstable_cache } from 'next/cache';
-import type { FixtureStatus, Fixture, FixturesQueryParams, FixturesResponse } from './types';
+import type { FixtureStatus, Fixture, FixturesQueryParams, FixturesResponse, League } from './types';
 import { MOCK_FIXTURES } from './mock-data';
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -16,6 +16,24 @@ export const getCachedFixtures = unstable_cache(
   ['fixtures'],
   { tags: [FIXTURES_CACHE_TAG], revalidate: 3600 },
 );
+
+/** Active leagues for the menu's league filter, cached like the fixtures */
+export const getCachedLeagues = unstable_cache(
+  () => getLeagues(),
+  ['leagues'],
+  { tags: [FIXTURES_CACHE_TAG], revalidate: 3600 },
+);
+
+export async function getLeagues(): Promise<League[]> {
+  if (!process.env.DATABASE_URL) return leaguesFromMock();
+  try {
+    return await queryLeagues();
+  } catch (err: unknown) {
+    const code = (err as { cause?: { code?: string } })?.cause?.code;
+    if (code === 'ENETUNREACH' || code === 'ECONNREFUSED' || code === 'ETIMEDOUT') return leaguesFromMock();
+    throw err;
+  }
+}
 
 export async function getFixtures(params: FixturesQueryParams = {}): Promise<FixturesResponse> {
   const fixtures = process.env.DATABASE_URL
@@ -34,6 +52,11 @@ function fromMock({ from, to, leagueId, status }: FixturesQueryParams): Fixture[
   if (leagueId != null)   data = data.filter(f => f.league.id === leagueId);
   if (status)             data = data.filter(f => f.status === status);
   return data.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+}
+
+function leaguesFromMock(): League[] {
+  const bySlug = new Map(MOCK_FIXTURES.map(f => [f.league.slug, f.league]));
+  return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ── Database path ──────────────────────────────────────────────────────────────
@@ -159,5 +182,39 @@ async function queryDatabase({ from, to, leagueId, status }: FixturesQueryParams
       logoUrl:   row.awayLogoUrl   ?? undefined,
       country:   row.awayCountry   ?? undefined,
     } : undefined,
+  }));
+}
+
+async function queryLeagues(): Promise<League[]> {
+  const { db }               = await import('@/db');
+  const { leagues, sports }  = await import('@/db/schema');
+  const { eq, asc }          = await import('drizzle-orm');
+
+  const rows = await db
+    .select({
+      id:        leagues.id,
+      sportId:   leagues.sportId,
+      name:      leagues.name,
+      shortName: leagues.shortName,
+      slug:      leagues.slug,
+      country:   leagues.country,
+      logoUrl:   leagues.logoUrl,
+      sportName: sports.name,
+      sportSlug: sports.slug,
+    })
+    .from(leagues)
+    .innerJoin(sports, eq(leagues.sportId, sports.id))
+    .where(eq(leagues.isActive, true))
+    .orderBy(asc(sports.name), asc(leagues.name));
+
+  return rows.map(r => ({
+    id:        r.id,
+    sportId:   r.sportId,
+    sport:     { id: r.sportId, name: r.sportName, slug: r.sportSlug },
+    name:      r.name,
+    shortName: r.shortName ?? undefined,
+    slug:      r.slug,
+    country:   r.country   ?? undefined,
+    logoUrl:   r.logoUrl   ?? undefined,
   }));
 }

@@ -1,7 +1,8 @@
+import type { League } from '@/lib/types';
 import { NavDrawer } from './NavDrawer';
 import { HeaderClock } from './HeaderClock';
 
-export function AppHeader() {
+export function AppHeader({ leagues }: { leagues: League[] }) {
   return (
     <header
       className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800 px-4"
@@ -10,7 +11,7 @@ export function AppHeader() {
       {/* Equal-width side columns keep the logo centred whatever sits either side */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center h-14 max-w-lg mx-auto w-full">
         <div className="justify-self-start">
-          <NavDrawer />
+          <NavDrawer leagues={leagues} />
         </div>
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}

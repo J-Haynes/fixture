@@ -24,6 +24,9 @@ const LEAGUE_CONFIG: Record<string, LeagueConfig> = {
   'super-rugby-pacific': { apiId: '4551', maxGameDurationHours: 3 },
   'nrl':                 { apiId: '4416', maxGameDurationHours: 3 },
   'fifa-world-cup':      { apiId: '4429', maxGameDurationHours: 3 },
+  'afl':                 { apiId: '4456', maxGameDurationHours: 3.5 },
+  'a-league-men':        { apiId: '4356', maxGameDurationHours: 2.5 },
+  'premier-league':      { apiId: '4328', maxGameDurationHours: 2.5 },
   'formula-1': {
     apiId: '4370',
     maxGameDurationHours: 4,
@@ -70,6 +73,7 @@ const SEASON_OVER_AFTER_MS = 7 * 24 * HOUR;
 interface SeasonActivity {
   seasonId:            number;
   leagueId:            number;
+  sportId:             number;
   year:                string;
   lastSyncedAt:        Date | null;
   slug:                string;
@@ -85,6 +89,7 @@ async function loadSeasonActivity(): Promise<SeasonActivity[]> {
     .select({
       seasonId:     seasons.id,
       leagueId:     seasons.leagueId,
+      sportId:      leagues.sportId,
       year:         seasons.year,
       lastSyncedAt: seasons.lastSyncedAt,
       slug:         leagues.slug,
@@ -144,6 +149,23 @@ function mapStatus(event: TsdbEvent, maxGameDurationHours: number): FixtureStatu
   return 'live';
 }
 
+// ── Round labels ──────────────────────────────────────────────────────────────
+
+/**
+ * TheSportsDB encodes non-numbered rounds in intRound: 0 = opening round (AFL),
+ * 500 = pre-season, 200 = the final, and 100–199 = other finals rounds (the exact
+ * codes vary by league, so they share one label).
+ */
+function roundLabel(intRound: string | null): string | null {
+  const n = Number(intRound);
+  if (intRound == null || intRound === '' || Number.isNaN(n)) return null;
+  if (n === 0)   return 'Opening Round';
+  if (n === 500) return 'Pre-season';
+  if (n === 200) return 'Final';
+  if (n >= 100)  return 'Finals';
+  return `Round ${n}`;
+}
+
 // ── Team name normalisation ───────────────────────────────────────────────────
 
 function normaliseName(name: string): string {
@@ -182,12 +204,12 @@ function findTeamByName(
 // ── Shared lookups (loaded once per run) ──────────────────────────────────────
 
 interface SyncContext {
-  allTeams:   { id: number; name: string }[];
+  allTeams:   { id: number; name: string; sportId: number }[];
   teamExtMap: Map<string, number>;
 }
 
 async function loadContext(): Promise<SyncContext> {
-  const allTeams = await db.select({ id: teams.id, name: teams.name }).from(teams);
+  const allTeams = await db.select({ id: teams.id, name: teams.name, sportId: teams.sportId }).from(teams);
 
   const teamMappings = await db
     .select({ externalId: externalIds.externalId, entityId: externalIds.entityId })
@@ -200,12 +222,14 @@ async function loadContext(): Promise<SyncContext> {
 async function resolveTeam(
   externalId: string | null,
   name:       string | null,
+  sportId:    number,
   ctx:        SyncContext,
 ): Promise<number | undefined> {
   const mapped = externalId ? ctx.teamExtMap.get(externalId) : undefined;
   if (mapped != null || !name) return mapped;
 
-  const teamId = findTeamByName(name, ctx.allTeams);
+  // Only match within the league's sport ("Melbourne City" must not match an NRL "… City")
+  const teamId = findTeamByName(name, ctx.allTeams.filter(t => t.sportId === sportId));
   if (teamId != null && externalId) {
     await db.insert(externalIds).values({
       entityType: 'team', entityId: teamId,
@@ -295,8 +319,8 @@ async function syncLeague(
 
   for (const event of events) {
     // Resolve teams (null for motorsport events)
-    const homeTeamId = await resolveTeam(event.idHomeTeam, event.strHomeTeam, ctx);
-    const awayTeamId = await resolveTeam(event.idAwayTeam, event.strAwayTeam, ctx);
+    const homeTeamId = await resolveTeam(event.idHomeTeam, event.strHomeTeam, season.sportId, ctx);
+    const awayTeamId = await resolveTeam(event.idAwayTeam, event.strAwayTeam, season.sportId, ctx);
 
     const status      = mapStatus(event, maxGameDurationHours);
     const scheduledAt = new Date(event.strTimestamp + 'Z');
@@ -310,7 +334,7 @@ async function syncLeague(
     // For team sports: round = named round or "Round N"
     const round = eventNameAsLabel
       ? (event.strRound ?? null)
-      : (event.strRound || (event.intRound ? `Round ${event.intRound}` : null));
+      : (event.strRound || roundLabel(event.intRound));
 
     const existing = existingByExtId.get(event.idEvent);
     let fixtureId: number;
@@ -328,9 +352,9 @@ async function syncLeague(
       if (existing.scheduledAt.getTime() !== scheduledAt.getTime()) patch.scheduledAt = scheduledAt;
       if (homeTeamId != null && existing.homeTeamId !== homeTeamId) patch.homeTeamId = homeTeamId;
       if (awayTeamId != null && existing.awayTeamId !== awayTeamId) patch.awayTeamId = awayTeamId;
-      // For motorsport, also keep the round and event name in sync
+      if (existing.round !== round) patch.round = round;
+      // For motorsport, also keep the event name in sync
       if (eventNameAsLabel) {
-        if (existing.round !== round) patch.round = round;
         if (sportMeta?.eventName !== event.strEvent) {
           sportMeta = { ...(sportMeta ?? {}), eventName: event.strEvent };
           patch.sportMeta = sportMeta;
