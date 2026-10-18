@@ -1,14 +1,18 @@
+'use client';
+
 import type { Fixture } from '@/lib/types';
 import { formatDateHeading } from '@/lib/dates';
+import { useIsClient } from '@/lib/use-is-client';
 import { FixtureCard } from './FixtureCard';
 
 interface Props {
-  dateKey: string; // YYYY-MM-DD in local timezone
+  dateKey: string; // YYYY-MM-DD in local timezone (UTC until hydrated)
   fixtures: Fixture[];
 }
 
 export function DateGroup({ dateKey, fixtures }: Props) {
-  const label = formatDateHeading(dateKey);
+  const isClient = useIsClient();
+  const label = formatDateHeading(dateKey, !isClient);
   const isToday = label === 'Today';
 
   return (

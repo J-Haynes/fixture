@@ -131,6 +131,9 @@ breaks hydration (React #418).
   - **Now:** comes from the shared minute clock ([src/lib/clock.ts](src/lib/clock.ts)), using the server's
     `renderedAt` during hydration.
   - **Grouping:** by **UTC** day during the server render and hydration (`isClient` false), then by local day.
+  - **Times/headings:** `KickoffTime` (FixtureCard) and `DateGroup` also render in UTC until `useIsClient`
+    ([src/lib/use-is-client.ts](src/lib/use-is-client.ts)) is true. `suppressHydrationWarning` alone leaves the
+    server's UTC text in place, because React only patches text when a later render differs from the hydration render.
   - **Refresh:** while any fixture is live (or past kickoff but still `scheduled`), it calls `router.refresh()` every
     2 min while the tab is visible. It also refreshes when the tab or PWA comes back after more than 5 min. Both
     re-request the ISR-cached route; keep any future polling on cached data too.
@@ -143,7 +146,7 @@ breaks hydration (React #418).
   opens `MatchDetailsPanel`, which fetches `/api/fixtures/[id]/details` on first open (see **Match details**).
 - **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. It shows one
   league's table at a time, from `getCachedTables` ([src/lib/standings.ts](src/lib/standings.ts)), with zone bars (e.g.
-  Champions League places, relegation) and followed teams highlighted. `TableSelector` (league logos only) sits in
+  Champions League places, relegation). Followed teams are deliberately not highlighted. `TableSelector` (league logos only) sits in
   the fixed bottom bar above the tabs. Leagues the viewer has hidden are skipped. `FixtureFeed` holds the selection, so it survives
   switching tabs.
 - **[src/components/layout/AppHeader.tsx](src/components/layout/AppHeader.tsx)**: a 3-column grid. On the left,

@@ -3,7 +3,7 @@
 import type { LeagueTable, TableZone } from '@/lib/types';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import { leagueBanner } from '@/lib/league-theme';
-import { usePreferences, showAllLeagues } from '@/lib/preferences';
+import { showAllLeagues } from '@/lib/preferences';
 
 const ZONE_BAR: Record<TableZone['tone'], string> = {
   good: 'bg-emerald-500',
@@ -21,8 +21,6 @@ export function LeagueTables({ tables, selected, anyTables }: {
   /** Whether any league has a table at all, to explain an empty tab */
   anyTables: boolean;
 }) {
-  const prefs = usePreferences();
-
   if (!selected) {
     return (
       <div className="text-center py-20 text-zinc-600">
@@ -40,7 +38,7 @@ export function LeagueTables({ tables, selected, anyTables }: {
     );
   }
 
-  return <Table table={selected} followed={prefs.followedTeams} />;
+  return <Table table={selected} />;
 }
 
 /** League picker for the Tables tab, shown in the fixed bottom bar above the tabs */
@@ -85,7 +83,7 @@ function zoneAt(zones: TableZone[], position: number) {
   return zones.find(z => position >= z.from && position <= z.to);
 }
 
-function Table({ table, followed }: { table: LeagueTable; followed: string[] }) {
+function Table({ table }: { table: LeagueTable }) {
   const { league, rows, zones } = table;
   const banner = leagueBanner(league.slug);
 
@@ -118,14 +116,11 @@ function Table({ table, followed }: { table: LeagueTable; followed: string[] }) 
             const zone = zoneAt(zones, position);
             // A line between zones, e.g. under 4th in the Premier League
             const zoneEnds = zone && zone.to === position && position < rows.length;
-            const isFollowed = followed.includes(row.team.slug);
             const gd = row.goalsFor - row.goalsAgainst;
             return (
               <tr
                 key={row.team.id}
-                className={`border-t ${zoneEnds ? 'border-b border-b-zinc-600' : ''} border-zinc-800/70 ${
-                  isFollowed ? 'bg-emerald-500/10' : ''
-                }`}
+                className={`border-t ${zoneEnds ? 'border-b border-b-zinc-600' : ''} border-zinc-800/70`}
               >
                 <td className="relative py-1.5 pl-3 text-zinc-500">
                   {zone && <span className={`absolute inset-y-1 left-0 w-0.5 rounded-r ${ZONE_BAR[zone.tone]}`} aria-hidden="true" />}
@@ -134,7 +129,7 @@ function Table({ table, followed }: { table: LeagueTable; followed: string[] }) 
                 <td className="max-w-0 py-1.5">
                   <span className="flex items-center gap-1.5">
                     <TeamAvatar team={row.team} size="xs" />
-                    <span className={`truncate ${isFollowed ? 'font-semibold text-emerald-300' : 'text-zinc-200'}`}>
+                    <span className="truncate text-zinc-200">
                       {row.team.name}
                     </span>
                   </span>
