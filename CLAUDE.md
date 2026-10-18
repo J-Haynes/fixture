@@ -127,6 +127,9 @@ breaks hydration (React #418).
   every request. The app deliberately does **not** enable `cacheComponents`.
 - **[src/components/fixtures/FixtureFeed.tsx](src/components/fixtures/FixtureFeed.tsx)**: tabs, filtering and
   local-date grouping.
+  - **Tab:** the current tab and league table live in `sessionStorage` (`fixture:view`,
+    [src/lib/view-state.ts](src/lib/view-state.ts)), so a reload returns to them and a fresh visit starts on
+    Upcoming. Like preferences, the server render and hydration show the default (Upcoming).
   - **Stale games:** it hides `scheduled` fixtures more than 10 minutes past kickoff.
   - **Now:** comes from the shared minute clock ([src/lib/clock.ts](src/lib/clock.ts)), using the server's
     `renderedAt` during hydration.
@@ -152,7 +155,9 @@ breaks hydration (React #418).
 - **[src/components/layout/AppHeader.tsx](src/components/layout/AppHeader.tsx)**: a 3-column grid. On the left,
   `NavDrawer` (hamburger + left drawer, portalled to `<body>` so the bottom nav can't cover it). In the middle, the
   centred logo. On the right, `HeaderClock` (today's date/time, client-only). The drawer holds `LeagueFilterList`
-  and a placeholder **Settings** button that does nothing yet.
+  and a placeholder **Settings** button that does nothing yet. While it's open, the page behind can't scroll: `NavDrawer` blocks
+  `wheel`/`touchmove` on the overlay except inside the drawer's list. `overflow: hidden` on `<body>` does nothing
+  here, because `<html>` is `overflow-y: scroll`.
 - **[src/lib/fixtures.ts](src/lib/fixtures.ts)**: the read path, with DB or mock data. `getFixtures`/`getCachedFixtures`
   return the fixtures in a window. `getLeagues`/`getCachedLeagues` return the active leagues whose current season has
   fixtures, each with its current-season teams, built from those fixtures. It
