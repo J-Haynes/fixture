@@ -19,7 +19,7 @@ const SIZE_MAP = {
 } as const;
 
 interface Props {
-  team: Team;
+  team: Pick<Team, 'id' | 'name' | 'shortName' | 'logoUrl'>;
   size?: keyof typeof SIZE_MAP;
 }
 

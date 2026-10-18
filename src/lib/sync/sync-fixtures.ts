@@ -231,6 +231,14 @@ function roundLabel(intRound: string | null): string | null {
   return `Round ${n}`;
 }
 
+// ── Highlights ────────────────────────────────────────────────────────────────
+
+/** The highlights link, stored as sportMeta.video. Only YouTube links are kept: the card renders it as a link. */
+function highlightsUrl(strVideo: string | null | undefined): string | undefined {
+  const url = strVideo?.trim();
+  return url && /^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//.test(url) ? url : undefined;
+}
+
 // ── Team name normalisation ───────────────────────────────────────────────────
 
 function normaliseName(name: string): string {
@@ -452,6 +460,7 @@ async function syncLeague(
     const round = eventNameAsLabel
       ? (event.strRound ?? null)
       : (event.strRound || (config.roundLabel ? config.roundLabel(event) : roundLabel(event.intRound)));
+    const video = highlightsUrl(event.strVideo);
 
     const existing = existingByExtId.get(event.idEvent);
     let fixtureId: number;
@@ -477,13 +486,19 @@ async function syncLeague(
           patch.sportMeta = sportMeta;
         }
       }
+      if (video && sportMeta?.video !== video) {
+        sportMeta = { ...(sportMeta ?? {}), video };
+        patch.sportMeta = sportMeta;
+      }
 
       if (Object.keys(patch).length > 0) {
         await db.update(fixtures).set(patch).where(eq(fixtures.id, fixtureId));
         changed++;
       }
     } else {
-      sportMeta = eventNameAsLabel ? { eventName: event.strEvent } : null;
+      sportMeta = eventNameAsLabel || video
+        ? { ...(eventNameAsLabel && { eventName: event.strEvent }), ...(video && { video }) }
+        : null;
 
       const [inserted] = await db
         .insert(fixtures)

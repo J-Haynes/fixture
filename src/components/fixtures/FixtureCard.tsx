@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Fixture, Team } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
@@ -7,6 +8,7 @@ import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
 import { leagueBanner } from '@/lib/league-theme';
 import { usePreferences } from '@/lib/preferences';
+import { MatchDetailsPanel } from './MatchDetailsPanel';
 
 interface Props {
   fixture: Fixture;
@@ -59,7 +61,64 @@ export function FixtureCard({ fixture }: Props) {
           <EventLayout league={league} round={round} scheduledAt={scheduledAt} status={status} sportMeta={sportMeta} />
         )}
       </div>
+
+      {status === 'finished' && (
+        <ResultFooter fixtureId={fixture.id} video={sportMeta?.video} hasDetails={!!isTeamMatch && league.sport?.slug === 'football'} />
+      )}
     </article>
+  );
+}
+
+// ── Result footer: highlights link and (football) match details ─────────────
+
+function ResultFooter({ fixtureId, video, hasDetails }: { fixtureId: number; video: unknown; hasDetails: boolean }) {
+  const [open, setOpen] = useState(false);
+  // Stored by the sync only if it's a YouTube link
+  const highlights = typeof video === 'string' && video.startsWith('https://') ? video : undefined;
+  if (!highlights && !hasDetails) return null;
+
+  const panelId = `match-details-${fixtureId}`;
+  return (
+    <div className="border-t border-zinc-800">
+      <div className="flex divide-x divide-zinc-800 text-xs font-medium">
+        {highlights && (
+          <a
+            href={highlights}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+              <path d="M8 5.5v13l11-6.5z" />
+            </svg>
+            Highlights
+          </a>
+        )}
+        {hasDetails && (
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            aria-controls={panelId}
+            className="flex flex-1 items-center justify-center gap-1 py-2.5 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+          >
+            Match details
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {open && (
+        <div id={panelId} className="border-t border-zinc-800 px-4">
+          <MatchDetailsPanel fixtureId={fixtureId} />
+        </div>
+      )}
+    </div>
   );
 }
 

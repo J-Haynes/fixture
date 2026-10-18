@@ -55,3 +55,54 @@ export interface FixturesResponse {
   from: string;
   to: string;
 }
+
+/** A football result's timeline and stats, loaded on tap from /api/fixtures/[id]/details */
+export interface MatchDetails {
+  /** Goals, missed penalties and red cards, in match order */
+  events: MatchEvent[];
+  /** A curated subset of the match stats, in display order */
+  stats:  MatchStat[];
+}
+
+export interface MatchEvent {
+  minute: number;
+  kind:   'goal' | 'penalty' | 'own-goal' | 'missed-penalty' | 'red-card';
+  /** The side the event counts for (an own goal is listed under the team it was scored for) */
+  side:   'home' | 'away';
+  player: string;
+  assist?: string;
+}
+
+export interface MatchStat {
+  label: string;
+  home:  number;
+  away:  number;
+  /** Shown with a % sign */
+  percent?: boolean;
+}
+
+/** Standings for one league, computed from its current season's results */
+export interface LeagueTable {
+  league: Pick<League, 'id' | 'name' | 'shortName' | 'slug' | 'logoUrl'>;
+  rows:   TableRow[];
+  /** Qualification/relegation bands, as 1-based position ranges */
+  zones:  TableZone[];
+}
+
+export interface TableRow {
+  team:   Pick<Team, 'id' | 'name' | 'shortName' | 'slug' | 'logoUrl'>;
+  played: number;
+  won:    number;
+  drawn:  number;
+  lost:   number;
+  goalsFor:     number;
+  goalsAgainst: number;
+  points: number;
+}
+
+export interface TableZone {
+  from:  number;
+  to:    number;
+  label: string;
+  tone:  'good' | 'mid' | 'bad';
+}

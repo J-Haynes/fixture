@@ -3,6 +3,7 @@
 export const revalidate = 3600;
 
 import { getCachedFixtures, getCachedLeagues } from '@/lib/fixtures';
+import { getCachedTables } from '@/lib/standings';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { FixtureFeed } from '@/components/fixtures/FixtureFeed';
 
@@ -19,16 +20,17 @@ export default async function HomePage() {
   const to = new Date(today);
   to.setDate(to.getDate() + 14); // show next 2 rounds of fixtures
 
-  const [{ fixtures }, leagues] = await Promise.all([
+  const [{ fixtures }, leagues, tables] = await Promise.all([
     getCachedFixtures({ from: isoDate(from), to: isoDate(to) }),
     getCachedLeagues(),
+    getCachedTables(),
   ]);
 
   return (
     <>
       <AppHeader leagues={leagues} />
       <main>
-        <FixtureFeed fixtures={fixtures} renderedAt={today.getTime()} />
+        <FixtureFeed fixtures={fixtures} tables={tables} renderedAt={today.getTime()} />
       </main>
     </>
   );

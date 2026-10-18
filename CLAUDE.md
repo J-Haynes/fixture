@@ -10,9 +10,9 @@
 ## What this is
 
 **Fixture** (package name `sportsapp`) is a mobile-first PWA at **https://www.fixture.nz** that shows upcoming
-fixtures, live scores and recent results for a hand-picked set of leagues. It is a single page: an **Upcoming** tab
-(scheduled / live / postponed / cancelled) and a **Results** tab (finished, newest first), grouped by day in the
-viewer's local timezone. The window shown is today ±14 days. A hamburger menu lets each viewer turn leagues on or
+fixtures, live scores and recent results for a hand-picked set of leagues. It is a single page with three tabs:
+**Upcoming** (scheduled / live / postponed / cancelled) and **Results** (finished, newest first), both grouped by day
+in the viewer's local timezone, and **Tables** (football standings). The window shown is today ±14 days. A hamburger menu lets each viewer turn leagues on or
 off and follow teams (see **Filters** below); these choices are stored on the device, with no accounts.
 
 **Backlog:** GitHub issues on `J-Haynes/fixture`. Issue **#9** is the tracker, with phases and done/not-done ticks.
@@ -138,7 +138,12 @@ breaks hydration (React #418).
   `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts) (shared with the menu). It uses
   `TeamMatchLayout` when both teams exist and `EventLayout` otherwise (motorsport: event name + podium from
   `sportMeta`). In results, the loser's name and score are grey (a draw keeps both white). Followed teams get an
-  emerald star badge on the logo's corner (`TeamSide`, via `usePreferences`).
+  emerald star badge on the logo's corner (`TeamSide`, via `usePreferences`). Finished games get a `ResultFooter`:
+  a **Highlights** link (`sportMeta.video`, when there is one) and, for football, a **Match details** toggle that
+  opens `MatchDetailsPanel`, which fetches `/api/fixtures/[id]/details` on first open (see **Match details**).
+- **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. One table per
+  league from `getCachedTables` ([src/lib/standings.ts](src/lib/standings.ts)), skipping leagues the viewer has
+  hidden, with zone bars (e.g. Champions League places, relegation) and followed teams highlighted.
 - **[src/components/layout/AppHeader.tsx](src/components/layout/AppHeader.tsx)**: a 3-column grid. On the left,
   `NavDrawer` (hamburger + left drawer, portalled to `<body>` so the bottom nav can't cover it). In the middle, the
   centred logo. On the right, `HeaderClock` (today's date/time, client-only). The drawer holds `LeagueFilterList`
@@ -163,7 +168,9 @@ Decided design (#16): **follow teams, not teams-per-league.** There are two inde
 `fixture:prefs` as `v: 2` (`hiddenLeagues`, `followedTeams` as team slugs, `leagueModes`); `v: 1` (hidden leagues
 only) is migrated on read. Hidden leagues are stored rather than shown ones, so new leagues appear by default.
 Cups/continental competitions default to "My teams only" (`MY_TEAMS_BY_DEFAULT`, currently just
-`champions-league`); everything else defaults to "All games". `isFixtureVisible` is the single rule:
+`champions-league`); everything else defaults to "All games". Leagues in `SINGLE_TEAM_LEAGUES` (`all-blacks-tests`)
+are already one team's games, so `hasTeamFilter` hides their chevron and they are always "All games".
+`isFixtureVisible` is the single rule:
 - a hidden league shows nothing;
 - a "mine" league shows only fixtures with a followed team;
 - motorsport (no teams) is exempt from "mine".
@@ -223,7 +230,28 @@ The sync is built to make as few API calls and DB writes as possible. Each run:
 9. The route calls `revalidateTag(FIXTURES_CACHE_TAG, { expire: 0 })` when `changed > 0`.
 
 Because the sync only writes changed rows and revalidates only on change, **any new field shown in the UI must be
-part of the change comparison in `syncLeague`**. Otherwise updates to it won't reach the cached page.
+part of the change comparison in `syncLeague`**. Otherwise updates to it won't reach the cached page. The
+highlights link is an example: `strVideo` (from the same `eventsseason.php` list, so no extra calls) is stored as
+`sportMeta.video` only if `highlightsUrl` accepts it as a YouTube link, and compared on every run. Coverage is good
+for NBA/AFL/NRL/A-League, partial for the EPL, and nil for the Champions League and rugby.
+
+### Match details and tables
+
+- **Match details** (football only: TheSportsDB has no timeline, stats or lineups for NRL, AFL, rugby or the NBA).
+  [src/lib/match-details.ts](src/lib/match-details.ts) looks up the fixture's provider event ID, then calls
+  `lookuptimeline.php` and `lookupeventstats.php`. It keeps goals (normal/penalty/own goal), missed penalties and
+  red cards, and a curated list of stats, dropping 0–0 rows (the A-League has no xG). An own goal is listed under the
+  team it counted for. TheSportsDB's goal entries add up to the final score (VAR-cancelled goals are not listed), so
+  fewer goals than the score means "still filling in": the route serves that with a 5-minute cache and doesn't store
+  it. Complete details are kept by `unstable_cache` for a week and CDN-cached for a day, so a game costs one DB query
+  and two API calls on its first tap, and nothing after.
+- **Tables** ([src/lib/standings.ts](src/lib/standings.ts)) are computed from our own current-season fixtures, not
+  taken from `lookuptable.php`, which has no Champions League table. The rules are 3/1/0 points, then goal
+  difference, then goals scored; points deductions and head-to-head tie-breakers aren't modelled. The Champions
+  League counts only "League phase" rounds. `TABLES` holds each league's zones. They matched the provider exactly
+  for the Premier League and A-League in Oct 2026. Tables are cached under the `fixtures` tag and passed to the page,
+  adding about 17 KB of HTML. Adding another sport means different points rules: NRL byes and Super Rugby bonus
+  points can't be derived from scores.
 
 `mapStatus` maps TheSportsDB `strStatus` to `FixtureStatus`. When the API gives no usable status, a kickoff in the
 past means `live` until `maxGameDurationHours` have elapsed, and `finished` after that.
@@ -255,7 +283,7 @@ season and inserts no fixtures.
 - `teams` (sportId, slug unique, logoUrl, shortName). There's no team↔league link table; membership comes from fixtures.
 - `fixtures`: seasonId, nullable home/away team ids (null for motorsport), `scheduled_at` timestamptz (UTC),
   `status` text (`scheduled|live|finished|postponed|cancelled`), round, scores, and `sport_meta` jsonb
-  (`eventName`, `podium: string[]`, `podiumCheckedAt`). Indexed on `(season_id, scheduled_at)` and `scheduled_at`.
+  (`eventName`, `podium: string[]`, `podiumCheckedAt`, `video`). Indexed on `(season_id, scheduled_at)` and `scheduled_at`.
 - `external_ids`: maps internal IDs to provider IDs (`entity_type`, `entity_id`, `provider`, `external_id`). It has
   two unique keys, `(entity_type, entity_id, provider)` and `(provider, entity_type, external_id)`; the sync's upsert
   targets the second. The design allows a second provider (e.g. for standings, #25).
@@ -275,6 +303,7 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
 | Route | Purpose |
 |---|---|
 | `GET /` | The app |
+| `GET /api/fixtures/[id]/details` | Goals, red cards and stats for a finished football fixture (our fixture ID). 404 for anything else. CDN-cached a day once complete, 5 min while TheSportsDB is still filling in. |
 | `GET /api/cron/sync[?force]` | Runs the sync. Requires `Authorization: Bearer $CRON_SECRET`. Returns `{ ok, synced, skipped, processed, changed, rolled, errors }`. `maxDuration = 60`. |
 | `/icon.svg`, `/apple-icon.png`, `/favicon.ico` | File-based metadata icons in `src/app/` (don't also put `icon.svg` in `public/`; the paths would clash) |
 
@@ -327,10 +356,12 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
 - **TheSportsDB v1** (`https://www.thesportsdb.com/api/v1/json/{key}/…`). Endpoints used:
   - `eventsseason.php?id&s`: cached by TheSportsDB for up to about 15 min (`x-tsdb-cache: HIT`);
   - `eventsday.php?d&l`: fresh, used in the live tier only;
-  - `eventresults.php?id`.
+  - `eventresults.php?id`;
+  - `lookuptimeline.php?id`, `lookupeventstats.php?id`: football match details, on tap.
 
   Timestamps are UTC without a `Z`, so the code appends `'Z'`. Status/score fields are strings and are often empty.
-  `lookuptable.php` (standings) only works for the football leagues; see #25 for standings and other sources.
+  Not used, but available: `lookuptable.php` (only the EPL and A-League), `lookuplineup.php` (football), and
+  `lookuptv.php` (broadcasters for every sport, including NZ channels, a few days before kickoff).
 - **Supabase Postgres**: use the pooler connection string; direct IPv6 connections fail from many networks.
 - **Database client** ([src/db/index.ts](src/db/index.ts)): `max: 1` connection per serverless instance with
   `idle_timeout: 20`. Queries run sequentially, so `Promise.all` over DB calls gains nothing.

@@ -25,6 +25,14 @@ export interface Preferences {
 /** Cups and continental competitions are noise unless your team is in them */
 const MY_TEAMS_BY_DEFAULT = new Set(['champions-league']);
 
+/** Leagues that are already one team's games, so a team filter would do nothing */
+const SINGLE_TEAM_LEAGUES = new Set(['all-blacks-tests']);
+
+/** Whether the menu offers the All games / My teams toggle and team list for a league */
+export function hasTeamFilter(slug: string): boolean {
+  return !SINGLE_TEAM_LEAGUES.has(slug);
+}
+
 const DEFAULTS: Preferences = { v: 2, hiddenLeagues: [], followedTeams: [], leagueModes: {} };
 
 let cached: Preferences | null = null;
@@ -101,6 +109,7 @@ export function setLeagueMode(slug: string, mode: LeagueMode) {
 }
 
 export function leagueMode(prefs: Preferences, slug: string): LeagueMode {
+  if (!hasTeamFilter(slug)) return 'all';
   return prefs.leagueModes[slug] ?? (MY_TEAMS_BY_DEFAULT.has(slug) ? 'mine' : 'all');
 }
 

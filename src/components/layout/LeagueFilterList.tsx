@@ -6,7 +6,7 @@ import { leagueBanner } from '@/lib/league-theme';
 import { getSportEmoji } from '@/lib/sports';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import {
-  usePreferences, toggleLeague, showAllLeagues, toggleTeam, setLeagueMode, leagueMode, type LeagueMode,
+  usePreferences, toggleLeague, showAllLeagues, toggleTeam, setLeagueMode, leagueMode, hasTeamFilter, type LeagueMode,
 } from '@/lib/preferences';
 
 interface Props {
@@ -65,7 +65,8 @@ export function LeagueFilterList({ leagues }: Props) {
             const on = !hidden.has(league.slug);
             const banner = leagueBanner(league.slug);
             const label = league.shortName ?? league.name;
-            const teams = league.teams ?? [];
+            // A league of one team's games (All Blacks Tests) has nothing to filter, so no chevron
+            const teams = hasTeamFilter(league.slug) ? league.teams ?? [] : [];
             const mode = leagueMode(prefs, league.slug);
             const isExpanded = expanded === league.slug;
             const panelId = `league-teams-${league.slug}`;
