@@ -1,8 +1,8 @@
 // League tables, computed from each league's current-season results rather than taken from
 // the provider: TheSportsDB only has tables for some football leagues (not the Champions
 // League), and this keeps them in step with the scores on the cards. Football rules: 3 points
-// for a win, 1 for a draw; ties broken on goal difference, then goals scored. Points deductions
-// and head-to-head tie-breakers aren't modelled.
+// for a win, 1 for a draw; ties broken per league (see TIEBREAKS). Points deductions and
+// head-to-head tie-breakers aren't modelled.
 
 import { unstable_cache } from 'next/cache';
 import { FIXTURES_CACHE_TAG } from './fixtures';
@@ -10,6 +10,8 @@ import type { LeagueTable, TableRow, TableZone } from './types';
 
 interface TableConfig {
   zones: TableZone[];
+  /** How teams level on points are ordered (default: goal difference, then goals scored) */
+  tiebreak?: 'standard' | 'uefa';
   /** Which fixtures count, by round label (e.g. the Champions League's league phase only) */
   counts?: (round: string | null) => boolean;
 }
@@ -30,7 +32,8 @@ const TABLES: Record<string, TableConfig> = {
       { from: 9,  to: 24, label: 'Knockout play-offs', tone: 'mid'  },
       { from: 25, to: 36, label: 'Eliminated',         tone: 'bad'  },
     ],
-    counts: round => round?.startsWith('League phase') ?? false,
+    counts:   round => round?.startsWith('League phase') ?? false,
+    tiebreak: 'uefa',
   },
 };
 
@@ -89,7 +92,7 @@ async function queryTables(): Promise<LeagueTable[]> {
     ...t, shortName: t.shortName ?? undefined, logoUrl: t.logoUrl ?? undefined,
   }]));
 
-  const byLeague = new Map<string, { table: LeagueTable; rows: Map<number, TableRow> }>();
+  const byLeague = new Map<string, LeagueTally>();
   for (const r of rows) {
     const config = TABLES[r.slug];
     if (config.counts && !config.counts(r.round)) continue;
@@ -103,40 +106,103 @@ async function queryTables(): Promise<LeagueTable[]> {
           rows:   [],
           zones:  config.zones,
         },
-        rows: new Map(),
+        teams:    new Map(),
+        complete: true,
       };
       byLeague.set(r.slug, entry);
     }
 
-    const row = (id: number) => {
-      let row = entry!.rows.get(id);
-      if (!row) {
-        row = { team: teamById.get(id)!, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0 };
-        entry!.rows.set(id, row);
+    const tally = (id: number) => {
+      let t = entry!.teams.get(id);
+      if (!t) {
+        t = {
+          row: { team: teamById.get(id)!, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          awayGoals: 0, awayWins: 0, opponents: [],
+        };
+        entry!.teams.set(id, t);
       }
-      return row;
+      return t;
     };
-    const home = row(r.homeId), away = row(r.awayId);
-    if (r.status !== 'finished' || r.homeScore == null || r.awayScore == null) continue;
+    const home = tally(r.homeId), away = tally(r.awayId);
+    if (r.status !== 'finished' || r.homeScore == null || r.awayScore == null) {
+      entry.complete = false;
+      continue;
+    }
 
-    for (const [side, gf, ga] of [[home, r.homeScore, r.awayScore], [away, r.awayScore, r.homeScore]] as const) {
-      side.played++;
-      side.goalsFor     += gf;
-      side.goalsAgainst += ga;
-      if (gf > ga)        { side.won++;   side.points += 3; }
-      else if (gf === ga) { side.drawn++; side.points += 1; }
-      else                  side.lost++;
+    home.opponents.push(r.awayId);
+    away.opponents.push(r.homeId);
+    away.awayGoals += r.awayScore;
+    if (r.awayScore > r.homeScore) away.awayWins++;
+    for (const [{ row }, gf, ga] of [[home, r.homeScore, r.awayScore], [away, r.awayScore, r.homeScore]] as const) {
+      row.played++;
+      row.goalsFor     += gf;
+      row.goalsAgainst += ga;
+      if (gf > ga)        { row.won++;   row.points += 3; }
+      else if (gf === ga) { row.drawn++; row.points += 1; }
+      else                  row.lost++;
     }
   }
 
   return TABLE_LEAGUES.flatMap(slug => {
     const entry = byLeague.get(slug);
     if (!entry) return [];
-    entry.table.rows = [...entry.rows.values()].sort((a, b) =>
-      b.points - a.points
-      || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst)
-      || b.goalsFor - a.goalsFor
-      || a.team.name.localeCompare(b.team.name));
+    const order = TIEBREAKS[TABLES[slug].tiebreak ?? 'standard'];
+    entry.table.rows = [...entry.teams.values()]
+      .sort((a, b) => order(a, b, entry))
+      .map(t => t.row);
     return [entry.table];
   });
 }
+
+// ── Ordering ──────────────────────────────────────────────────────────────────
+
+interface TeamTally {
+  row:       TableRow;
+  awayGoals: number;
+  awayWins:  number;
+  /** One entry per finished game, so an opponent met twice counts twice */
+  opponents: number[];
+}
+
+interface LeagueTally {
+  table:    LeagueTable;
+  teams:    Map<number, TeamTally>;
+  /** Every counted fixture has finished */
+  complete: boolean;
+}
+
+type Order = (a: TeamTally, b: TeamTally, league: LeagueTally) => number;
+
+const gd = (t: TeamTally) => t.row.goalsFor - t.row.goalsAgainst;
+
+/** Sum of a stat over the team's opponents (UEFA criteria 6–8) */
+function opponentsTotal(t: TeamTally, league: LeagueTally, stat: (o: TeamTally) => number): number {
+  return t.opponents.reduce((sum, id) => sum + stat(league.teams.get(id)!), 0);
+}
+
+const TIEBREAKS: Record<'standard' | 'uefa', Order> = {
+  // Premier League / A-League: points, goal difference, goals scored (then head-to-head, not modelled)
+  standard: (a, b) =>
+    b.row.points - a.row.points
+    || gd(b) - gd(a)
+    || b.row.goalsFor - a.row.goalsFor
+    || a.row.team.name.localeCompare(b.row.team.name),
+
+  // UEFA league phase: goal difference, goals, away goals, wins, away wins; once the phase is
+  // complete, opponents' collective points, goal difference and goals. Disciplinary points and
+  // club coefficient (criteria 9–10) aren't in our data, so it falls back to the abbreviated name,
+  // which is UEFA's rule before the final matchday anyway.
+  uefa: (a, b, league) =>
+    b.row.points - a.row.points
+    || gd(b) - gd(a)
+    || b.row.goalsFor - a.row.goalsFor
+    || b.awayGoals - a.awayGoals
+    || b.row.won - a.row.won
+    || b.awayWins - a.awayWins
+    || (league.complete
+      ? opponentsTotal(b, league, o => o.row.points) - opponentsTotal(a, league, o => o.row.points)
+        || opponentsTotal(b, league, gd) - opponentsTotal(a, league, gd)
+        || opponentsTotal(b, league, o => o.row.goalsFor) - opponentsTotal(a, league, o => o.row.goalsFor)
+      : 0)
+    || (a.row.team.shortName ?? a.row.team.name).localeCompare(b.row.team.shortName ?? b.row.team.name),
+};

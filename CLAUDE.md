@@ -141,9 +141,11 @@ breaks hydration (React #418).
   emerald star badge on the logo's corner (`TeamSide`, via `usePreferences`). Finished games get a `ResultFooter`:
   a **Highlights** link (`sportMeta.video`, when there is one) and, for football, a **Match details** toggle that
   opens `MatchDetailsPanel`, which fetches `/api/fixtures/[id]/details` on first open (see **Match details**).
-- **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. One table per
-  league from `getCachedTables` ([src/lib/standings.ts](src/lib/standings.ts)), skipping leagues the viewer has
-  hidden, with zone bars (e.g. Champions League places, relegation) and followed teams highlighted.
+- **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. It shows one
+  league's table at a time, from `getCachedTables` ([src/lib/standings.ts](src/lib/standings.ts)), with zone bars (e.g.
+  Champions League places, relegation) and followed teams highlighted. `TableSelector` sits in the fixed bottom bar
+  above the tabs. Leagues the viewer has hidden are skipped. `FixtureFeed` holds the selection, so it survives
+  switching tabs.
 - **[src/components/layout/AppHeader.tsx](src/components/layout/AppHeader.tsx)**: a 3-column grid. On the left,
   `NavDrawer` (hamburger + left drawer, portalled to `<body>` so the bottom nav can't cover it). In the middle, the
   centred logo. On the right, `HeaderClock` (today's date/time, client-only). The drawer holds `LeagueFilterList`
@@ -246,9 +248,15 @@ for NBA/AFL/NRL/A-League, partial for the EPL, and nil for the Champions League 
   it. Complete details are kept by `unstable_cache` for a week and CDN-cached for a day, so a game costs one DB query
   and two API calls on its first tap, and nothing after.
 - **Tables** ([src/lib/standings.ts](src/lib/standings.ts)) are computed from our own current-season fixtures, not
-  taken from `lookuptable.php`, which has no Champions League table. The rules are 3/1/0 points, then goal
-  difference, then goals scored; points deductions and head-to-head tie-breakers aren't modelled. The Champions
-  League counts only "League phase" rounds. `TABLES` holds each league's zones. They matched the provider exactly
+  taken from `lookuptable.php`, which has no Champions League table. Points are 3/1/0. Ties are broken per league
+  (`TIEBREAKS`):
+  - `standard` (EPL, A-League): goal difference, then goals scored. Head-to-head isn't modelled.
+  - `uefa` (Champions League): UEFA's league-phase order, i.e. goal difference, goals, away goals, wins, away wins.
+    Once the phase is complete, opponents' collective points, goal difference and goals follow. Disciplinary
+    points and club coefficient aren't in our data, so it ends on the abbreviated name, which is UEFA's own rule
+    before the final matchday.
+
+  Points deductions aren't modelled. The Champions League counts only "League phase" rounds. `TABLES` holds each league's zones. They matched the provider exactly
   for the Premier League and A-League in Oct 2026. Tables are cached under the `fixtures` tag and passed to the page,
   adding about 17 KB of HTML. Adding another sport means different points rules: NRL byes and Super Rugby bonus
   points can't be derived from scores.

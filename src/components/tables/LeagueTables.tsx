@@ -11,17 +11,24 @@ const ZONE_BAR: Record<TableZone['tone'], string> = {
   bad:  'bg-red-500',
 };
 
-/** The Tables tab: one standings table per league the viewer hasn't switched off */
-export function LeagueTables({ tables }: { tables: LeagueTable[] }) {
+/**
+ * The Tables tab body: the selected league's table. `tables` is already filtered to the
+ * leagues the viewer hasn't switched off; `TableSelector` (in the bottom bar) picks one.
+ */
+export function LeagueTables({ tables, selected, anyTables }: {
+  tables:    LeagueTable[];
+  selected?: LeagueTable;
+  /** Whether any league has a table at all, to explain an empty tab */
+  anyTables: boolean;
+}) {
   const prefs = usePreferences();
-  const visible = tables.filter(t => !prefs.hiddenLeagues.includes(t.league.slug));
 
-  if (visible.length === 0) {
+  if (!selected) {
     return (
       <div className="text-center py-20 text-zinc-600">
         <p className="text-4xl mb-3">📊</p>
         <p className="font-medium text-zinc-500">No tables to show</p>
-        {tables.length > 0 && (
+        {anyTables && tables.length === 0 && (
           <>
             <p className="mt-2 text-sm text-zinc-600">The leagues with tables are switched off in the menu.</p>
             <button type="button" onClick={showAllLeagues} className="mt-3 text-sm font-medium text-emerald-400 hover:text-emerald-300">
@@ -33,11 +40,40 @@ export function LeagueTables({ tables }: { tables: LeagueTable[] }) {
     );
   }
 
+  return <Table table={selected} followed={prefs.followedTeams} />;
+}
+
+/** League picker for the Tables tab, shown in the fixed bottom bar above the tabs */
+export function TableSelector({ tables, selected, onSelect }: {
+  tables:   LeagueTable[];
+  selected: string | undefined;
+  onSelect: (slug: string) => void;
+}) {
+  if (tables.length < 2) return null;
   return (
-    <div className="space-y-6">
-      {visible.map(table => (
-        <Table key={table.league.slug} table={table} followed={prefs.followedTeams} />
-      ))}
+    <div role="tablist" aria-label="League table" className="flex gap-1.5 overflow-x-auto px-3 pt-2 pb-0.5 [scrollbar-width:none]">
+      {tables.map(({ league }) => {
+        const active = league.slug === selected;
+        return (
+          <button
+            key={league.slug}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(league.slug)}
+            // Logo above the name so three leagues fit at 375 px; more than that scroll sideways
+            className={`flex min-w-[6.5rem] flex-1 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-medium transition-colors ${
+              active ? 'bg-zinc-700 text-white' : 'bg-zinc-800/60 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {league.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={league.logoUrl} alt="" className="h-4 w-auto shrink-0" />
+            )}
+            {league.shortName ?? league.name}
+          </button>
+        );
+      })}
     </div>
   );
 }

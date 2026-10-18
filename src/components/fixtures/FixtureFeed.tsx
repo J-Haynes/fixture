@@ -7,7 +7,7 @@ import { toLocalDateKey } from '@/lib/dates';
 import { subscribeClock, getClock } from '@/lib/clock';
 import { usePreferences, showAllLeagues, isFixtureVisible } from '@/lib/preferences';
 import { DateGroup } from './DateGroup';
-import { LeagueTables } from '@/components/tables/LeagueTables';
+import { LeagueTables, TableSelector } from '@/components/tables/LeagueTables';
 
 type View = 'upcoming' | 'results' | 'tables';
 
@@ -35,6 +35,8 @@ interface Props {
 
 export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
   const [view, setView] = useState<View>('upcoming');
+  // Kept here rather than in the Tables tab so the choice survives switching tabs
+  const [tableSlug, setTableSlug] = useState<string>();
   // The page HTML is cached, so hydrate with the render time (matching the server
   // markup) and then switch to the real clock, ticking once a minute.
   const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
@@ -87,12 +89,19 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
     return { grouped: Array.from(map.entries()), filteredOut: inView.length - filtered.length };
   }, [fixtures, view, now, prefs, isClient]);
 
+  const visibleTables = useMemo(
+    () => tables.filter(t => !prefs.hiddenLeagues.includes(t.league.slug)),
+    [tables, prefs],
+  );
+  const selectedTable = visibleTables.find(t => t.league.slug === tableSlug) ?? visibleTables[0];
+  const showSelector = view === 'tables' && visibleTables.length > 1;
+
   return (
     <>
-      {/* Scrollable feed — padding-bottom clears the fixed bottom nav */}
-      <div className="pb-24 max-w-lg mx-auto w-full px-4 py-5">
+      {/* Scrollable feed — padding-bottom clears the fixed bottom nav (and the table selector above it) */}
+      <div className={`${showSelector ? 'pb-36' : 'pb-24'} max-w-lg mx-auto w-full px-4 py-5`}>
         {view === 'tables' ? (
-          <LeagueTables tables={tables} />
+          <LeagueTables tables={visibleTables} selected={selectedTable} anyTables={tables.length > 0} />
         ) : grouped.length === 0 ? (
           <div className="text-center py-20 text-zinc-600">
             <p className="text-4xl mb-3">📭</p>
@@ -133,6 +142,11 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
         className="fixed bottom-0 inset-x-0 z-20 bg-zinc-900 border-t border-zinc-800"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
+        {showSelector && (
+          <div className="max-w-lg mx-auto">
+            <TableSelector tables={visibleTables} selected={selectedTable?.league.slug} onSelect={setTableSlug} />
+          </div>
+        )}
         <div className="flex max-w-lg mx-auto">
           {(['upcoming', 'results', 'tables'] as View[]).map(v => (
             <button
