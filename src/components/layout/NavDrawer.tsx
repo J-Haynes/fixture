@@ -12,6 +12,8 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   // The drawer is portalled to <body> (the sticky header's stacking context would
   // otherwise put it under the bottom nav), which only exists on the client.
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
@@ -24,14 +26,26 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
     };
     document.addEventListener('keydown', onKey);
 
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
+    // Stop the page behind the drawer scrolling. overflow: hidden won't do: <html> is
+    // overflow-y: scroll (globals.css), so the viewport ignores <body>'s overflow, and
+    // hiding <html>'s would drop the scrollbar track and shift the page on desktop.
+    // Only the drawer's list may scroll, and only when it overflows; its
+    // overscroll-contain stops the scroll chaining to the page at either end.
+    const overlay = overlayRef.current;
+    const blockScroll = (e: Event) => {
+      const nav = navRef.current;
+      if (nav && nav.contains(e.target as Node) && nav.scrollHeight > nav.clientHeight) return;
+      e.preventDefault();
+    };
+    overlay?.addEventListener('wheel', blockScroll, { passive: false });
+    overlay?.addEventListener('touchmove', blockScroll, { passive: false });
     closeRef.current?.focus();
 
     const trigger = triggerRef.current;
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
+      overlay?.removeEventListener('wheel', blockScroll);
+      overlay?.removeEventListener('touchmove', blockScroll);
       trigger?.focus();
     };
   }, [open]);
@@ -53,7 +67,7 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
       </button>
 
       {mounted && createPortal(
-        <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} inert={!open}>
+        <div ref={overlayRef} className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} inert={!open}>
           <div
             onClick={() => setOpen(false)}
             aria-hidden="true"
@@ -87,7 +101,7 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
               </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto overscroll-contain" aria-label="Main">
+            <nav ref={navRef} className="flex-1 overflow-y-auto overscroll-contain" aria-label="Main">
               <LeagueFilterList leagues={leagues} />
             </nav>
 

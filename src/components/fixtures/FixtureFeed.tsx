@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Fixture, LeagueTable } from '@/lib/types';
 import { toLocalDateKey } from '@/lib/dates';
 import { subscribeClock, getClock } from '@/lib/clock';
 import { usePreferences, showAllLeagues, isFixtureVisible } from '@/lib/preferences';
+import { useViewState, setView, setTableSlug, type View } from '@/lib/view-state';
 import { DateGroup } from './DateGroup';
 import { LeagueTables, TableSelector } from '@/components/tables/LeagueTables';
-
-type View = 'upcoming' | 'results' | 'tables';
 
 const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled']);
 
@@ -34,9 +33,8 @@ interface Props {
 }
 
 export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
-  const [view, setView] = useState<View>('upcoming');
-  // Kept here rather than in the Tables tab so the choice survives switching tabs
-  const [tableSlug, setTableSlug] = useState<string>();
+  // Kept in sessionStorage so a reload returns to the same tab and table
+  const { view, tableSlug } = useViewState();
   // The page HTML is cached, so hydrate with the render time (matching the server
   // markup) and then switch to the real clock, ticking once a minute.
   const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
