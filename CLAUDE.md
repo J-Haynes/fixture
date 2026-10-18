@@ -143,8 +143,8 @@ breaks hydration (React #418).
   opens `MatchDetailsPanel`, which fetches `/api/fixtures/[id]/details` on first open (see **Match details**).
 - **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. It shows one
   league's table at a time, from `getCachedTables` ([src/lib/standings.ts](src/lib/standings.ts)), with zone bars (e.g.
-  Champions League places, relegation) and followed teams highlighted. `TableSelector` sits in the fixed bottom bar
-  above the tabs. Leagues the viewer has hidden are skipped. `FixtureFeed` holds the selection, so it survives
+  Champions League places, relegation) and followed teams highlighted. `TableSelector` (league logos only) sits in
+  the fixed bottom bar above the tabs. Leagues the viewer has hidden are skipped. `FixtureFeed` holds the selection, so it survives
   switching tabs.
 - **[src/components/layout/AppHeader.tsx](src/components/layout/AppHeader.tsx)**: a 3-column grid. On the left,
   `NavDrawer` (hamburger + left drawer, portalled to `<body>` so the bottom nav can't cover it). In the middle, the
@@ -405,6 +405,9 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
 - Path alias `@/*` → `src/*`. Formatting: single quotes and semicolons, with column-aligned object literals in
   config-like code. Match the surrounding style.
 - Store times in UTC and render them in local time. Never format dates on the server.
+- `html { overflow-y: scroll }` in `globals.css` keeps the desktop scrollbar track visible, so the centred column and
+  the fixed bottom bar don't shift sideways when a short view (a league table) doesn't scroll. Don't swap it for
+  `scrollbar-gutter: stable`: fixed elements ignore the reserved gutter, so the bottom bar would still jump.
 - **Static assets:**
   - League logos are in `public/logos/`.
   - Teams: Super Rugby in `public/rugby/`, NRL in `public/rugbyleague/`, AFL in `public/afl/`, A-League Men in

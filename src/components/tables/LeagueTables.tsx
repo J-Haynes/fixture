@@ -61,16 +61,19 @@ export function TableSelector({ tables, selected, onSelect }: {
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(league.slug)}
-            // Logo above the name so three leagues fit at 375 px; more than that scroll sideways
-            className={`flex min-w-[6.5rem] flex-1 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-medium transition-colors ${
-              active ? 'bg-zinc-700 text-white' : 'bg-zinc-800/60 text-zinc-400 hover:text-zinc-200'
+            aria-label={league.name}
+            title={league.name}
+            // Logos only; more leagues than fit scroll sideways
+            className={`flex h-11 min-w-16 flex-1 items-center justify-center rounded-lg transition ${
+              active ? 'bg-zinc-700' : 'bg-zinc-800/60 opacity-60 grayscale hover:opacity-90 hover:grayscale-0'
             }`}
           >
-            {league.logoUrl && (
+            {league.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={league.logoUrl} alt="" className="h-4 w-auto shrink-0" />
+              <img src={league.logoUrl} alt="" className="max-h-7 max-w-12 object-contain" />
+            ) : (
+              <span className="text-xs font-medium text-zinc-300">{league.shortName ?? league.name}</span>
             )}
-            {league.shortName ?? league.name}
           </button>
         );
       })}
@@ -88,10 +91,10 @@ function Table({ table, followed }: { table: LeagueTable; followed: string[] }) 
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-      <h2 className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium ${banner.strip} border-b ${banner.divider} ${banner.text}`}>
+      <h2 className={`flex items-center gap-2 px-4 py-2.5 text-base font-semibold ${banner.strip} border-b ${banner.divider} ${banner.text}`}>
         {league.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={league.logoUrl} alt="" className="h-4 w-auto shrink-0" />
+          <img src={league.logoUrl} alt="" className="h-[1.375rem] w-auto shrink-0" />
         )}
         {league.shortName ?? league.name}
       </h2>
