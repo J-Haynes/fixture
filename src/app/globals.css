@@ -3,3 +3,10 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
 }
+
+/* Always show the scrollbar track, so the centred column and the fixed bottom bar don't jump
+   sideways when a short view (e.g. a league table) doesn't scroll. scrollbar-gutter: stable isn't
+   enough: fixed elements ignore the reserved gutter. No effect with overlay scrollbars (phones). */
+html {
+  overflow-y: scroll;
+}
