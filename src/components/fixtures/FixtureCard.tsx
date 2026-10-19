@@ -8,7 +8,6 @@ import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
 import { leagueBanner } from '@/lib/league-theme';
 import { usePreferences } from '@/lib/preferences';
-import { useIsClient } from '@/lib/use-is-client';
 import { MatchDetailsPanel } from './MatchDetailsPanel';
 
 interface Props {
@@ -227,20 +226,11 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
     default:
       // scheduled
       return (
-        <span className="text-sm font-semibold text-zinc-300 tabular-nums" suppressHydrationWarning>
-          <KickoffTime scheduledAt={scheduledAt} />
+        <span className="text-sm font-semibold text-zinc-300 tabular-nums">
+          {formatKickoffTime(scheduledAt)}
         </span>
       );
   }
-}
-
-/**
- * Kickoff time in the viewer's timezone. The cached server HTML (and hydration) show UTC;
- * the local time replaces it right after hydration.
- */
-function KickoffTime({ scheduledAt }: { scheduledAt: string }) {
-  const isClient = useIsClient();
-  return formatKickoffTime(scheduledAt, isClient ? undefined : 'UTC');
 }
 
 // ── Non-team event layout (motorsport, etc.) ────────────────────────────────
@@ -282,8 +272,8 @@ function EventLayout({ league, round, scheduledAt, status, sportMeta }: EventLay
       ) : status === 'live' ? (
         <StatusBadge status="live" />
       ) : status === 'scheduled' ? (
-        <span className="text-sm font-medium text-zinc-500 tabular-nums" suppressHydrationWarning>
-          <KickoffTime scheduledAt={scheduledAt} />
+        <span className="text-sm font-medium text-zinc-500 tabular-nums">
+          {formatKickoffTime(scheduledAt)}
         </span>
       ) : (status === 'postponed' || status === 'cancelled') ? (
         <StatusBadge status={status} />

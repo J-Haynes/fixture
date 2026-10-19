@@ -133,10 +133,10 @@ breaks hydration (React #418).
   - **Stale games:** it hides `scheduled` fixtures more than 10 minutes past kickoff.
   - **Now:** comes from the shared minute clock ([src/lib/clock.ts](src/lib/clock.ts)), using the server's
     `renderedAt` during hydration.
-  - **Grouping:** by **UTC** day during the server render and hydration (`isClient` false), then by local day.
-  - **Times/headings:** `KickoffTime` (FixtureCard) and `DateGroup` also render in UTC until `useIsClient`
-    ([src/lib/use-is-client.ts](src/lib/use-is-client.ts)) is true. `suppressHydrationWarning` alone leaves the
-    server's UTC text in place, because React only patches text when a later render differs from the hydration render.
+  - **Skeleton first:** the server render and hydration show `FeedSkeleton` instead of the feed (`isClient` false).
+    The feed renders right after, already grouped by local day with local kickoff times, filters and the saved
+    tab applied. An earlier version rendered UTC times and days first, which visibly jumped on load; don't
+    reintroduce viewer-dependent content into the server render. `DateGroup`/`FixtureCard` are client-only.
   - **Refresh:** while any fixture is live (or past kickoff but still `scheduled`), it calls `router.refresh()` every
     2 min while the tab is visible. It also refreshes when the tab or PWA comes back after more than 5 min. Both
     re-request the ISR-cached route; keep any future polling on cached data too.
@@ -163,8 +163,8 @@ breaks hydration (React #418).
   fixtures, each with its current-season teams, built from those fixtures. It
   uses dynamic imports so the postgres client isn't loaded when there is no DB. If the DB is unreachable, the mock
   fallback can stay cached for up to an hour.
-- **[src/lib/dates.ts](src/lib/dates.ts)**: all date display is in browser-local time. Elements that render dates
-  use `suppressHydrationWarning`.
+- **[src/lib/dates.ts](src/lib/dates.ts)**: all date display is in browser-local time, and only rendered on the
+  client (the feed after `FeedSkeleton`, `HeaderClock` after hydration).
 
 ### Filters (menu) and preferences
 
@@ -185,7 +185,7 @@ are already one team's games, so `hasTeamFilter` hides their chevron and they ar
 - a "mine" league shows only fixtures with a followed team;
 - motorsport (no teams) is exempt from "mine".
 
-The server render always shows everything, so a returning viewer's filters apply an instant after hydration. Still
+The server render shows a skeleton, so a returning viewer's filters are already applied when the feed appears. Still
 open in #16: an empty first-load call to action for new visitors.
 
 ### Sync ([src/lib/sync/sync-fixtures.ts](src/lib/sync/sync-fixtures.ts))
