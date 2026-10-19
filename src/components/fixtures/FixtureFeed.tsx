@@ -8,6 +8,7 @@ import { subscribeClock, getClock } from '@/lib/clock';
 import { usePreferences, showAllLeagues, isFixtureVisible } from '@/lib/preferences';
 import { useViewState, setView, setTableSlug, type View } from '@/lib/view-state';
 import { DateGroup } from './DateGroup';
+import { FeedSkeleton } from './FeedSkeleton';
 import { LeagueTables, TableSelector } from '@/components/tables/LeagueTables';
 
 const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled']);
@@ -39,9 +40,9 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
   // markup) and then switch to the real clock, ticking once a minute.
   const now = useSyncExternalStore(subscribeClock, getClock, () => renderedAt);
   const prefs = usePreferences();
-  // The server can't know the viewer's timezone, so the server render and hydration group
-  // fixtures by UTC day (a deterministic match); the client then regroups by local day.
-  // Grouping by local day straight away changes the markup and breaks hydration.
+  // The server can't know the viewer's timezone (nor their filters or saved tab), so the
+  // server render and hydration show a skeleton, and the feed appears right after with
+  // local days and kickoff times. Rendering the feed in UTC first made times visibly jump.
   const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const router = useRouter();
 
@@ -79,13 +80,13 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
 
     const map = new Map<string, Fixture[]>();
     for (const f of filtered) {
-      const key = isClient ? toLocalDateKey(f.scheduledAt) : f.scheduledAt.slice(0, 10);
+      const key = toLocalDateKey(f.scheduledAt);
       const bucket = map.get(key) ?? [];
       bucket.push(f);
       map.set(key, bucket);
     }
     return { grouped: Array.from(map.entries()), filteredOut: inView.length - filtered.length };
-  }, [fixtures, view, now, prefs, isClient]);
+  }, [fixtures, view, now, prefs]);
 
   const visibleTables = useMemo(
     () => tables.filter(t => !prefs.hiddenLeagues.includes(t.league.slug)),
@@ -98,7 +99,9 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
     <>
       {/* Scrollable feed — padding-bottom clears the fixed bottom nav (and the table selector above it) */}
       <div className={`${showSelector ? 'pb-36' : 'pb-24'} max-w-lg mx-auto w-full px-4 py-5`}>
-        {view === 'tables' ? (
+        {!isClient ? (
+          <FeedSkeleton />
+        ) : view === 'tables' ? (
           <LeagueTables tables={visibleTables} selected={selectedTable} anyTables={tables.length > 0} />
         ) : grouped.length === 0 ? (
           <div className="text-center py-20 text-zinc-600">

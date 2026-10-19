@@ -2,24 +2,21 @@
 
 import type { Fixture } from '@/lib/types';
 import { formatDateHeading } from '@/lib/dates';
-import { useIsClient } from '@/lib/use-is-client';
 import { FixtureCard } from './FixtureCard';
 
 interface Props {
-  dateKey: string; // YYYY-MM-DD in local timezone (UTC until hydrated)
+  dateKey: string; // YYYY-MM-DD in local timezone
   fixtures: Fixture[];
 }
 
 export function DateGroup({ dateKey, fixtures }: Props) {
-  const isClient = useIsClient();
-  const label = formatDateHeading(dateKey, !isClient);
+  const label = formatDateHeading(dateKey);
   const isToday = label === 'Today';
 
   return (
     <section>
       <h2
         className={`text-xs font-semibold uppercase tracking-wider mb-3 ${isToday ? 'text-white' : 'text-zinc-500'}`}
-        suppressHydrationWarning
       >
         {label}
       </h2>
