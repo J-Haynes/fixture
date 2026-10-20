@@ -30,3 +30,14 @@ const DEFAULT_BANNER: LeagueBanner = { strip: 'bg-zinc-800/60', divider: 'border
 export function leagueBanner(slug: string): LeagueBanner {
   return LEAGUE_BANNER[slug] ?? DEFAULT_BANNER;
 }
+
+// League logos are dark-first: most have white parts, so they sit on dark surfaces (the
+// banners above, the Tables tab's chips) in every theme. Where one sits on the card itself
+// (motorsport cards), the Light theme swaps in a version made for light backgrounds, if listed here.
+const LIGHT_BACKGROUND_LOGO: Record<string, string> = {
+  'v8-supercars': '/logos/v8-supercars-light.png', // Wikipedia's (black "CHAMPIONSHIP")
+};
+
+export function leagueLogoForLight(slug: string): string | undefined {
+  return LIGHT_BACKGROUND_LOGO[slug];
+}

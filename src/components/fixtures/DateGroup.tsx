@@ -19,9 +19,11 @@ export function DateGroup({ dateKey, fixtures, isLast }: Props) {
     // until the next day's heading reaches it and pushes it out.
     <section aria-label={`${day} ${date}`}>
       <h2
-        // Sticks just under the app header (h-14 + its 1px border + the notch)
-        className="sticky z-10 -mx-4 mb-1 flex items-baseline gap-2 bg-zinc-950 px-4 pb-3 pt-3"
-        style={{ top: 'calc(3.5rem + 1px + env(safe-area-inset-top))' }}
+        // Sticks under the app header (h-14 + the notch), tucked under its 1px border, and paints
+        // a few px of page colour above itself (the header, z-20, covers them). Lining the edges
+        // up exactly left a sub-pixel strip on phones that cards flashed through while scrolling.
+        className="sticky z-10 -mx-4 mb-1 flex items-baseline gap-2 bg-zinc-950 px-4 pb-3 pt-3 shadow-[0_-6px_0_var(--color-zinc-950)]"
+        style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}
       >
         <span className="text-xl font-bold tracking-tight text-zinc-100">{day}</span>
         <span className="text-base font-medium text-zinc-400">{date}</span>

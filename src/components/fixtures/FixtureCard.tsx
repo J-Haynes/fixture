@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
-import { leagueBanner } from '@/lib/league-theme';
+import { leagueBanner, leagueLogoForLight } from '@/lib/league-theme';
 import { usePreferences } from '@/lib/preferences';
 import { MatchDetailsPanel } from './MatchDetailsPanel';
 
@@ -236,7 +236,7 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
 // ── Non-team event layout (motorsport, etc.) ────────────────────────────────
 
 interface EventLayoutProps {
-  league: { logoUrl?: string | null; name: string };
+  league: { logoUrl?: string | null; name: string; slug: string };
   round?: string | null;
   scheduledAt: string;
   status: Fixture['status'];
@@ -250,12 +250,18 @@ function EventLayout({ league, round, scheduledAt, status, sportMeta }: EventLay
   const eventName = typeof sportMeta?.eventName === 'string' ? sportMeta.eventName : undefined;
   // Session type ("Qualifying", "Race") is already shown in the banner strip — body shows race name only
   const title = eventName ?? round;
+  // The logo sits on the card here, so the Light theme uses a light-background version if there is one
+  const lightLogo = leagueLogoForLight(league.slug);
 
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       {league.logoUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={league.logoUrl} alt={league.name} className="h-12 w-auto" />
+        <img src={league.logoUrl} alt={league.name} className={`h-12 w-auto ${lightLogo ? 'light:hidden' : ''}`} />
+      )}
+      {lightLogo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={lightLogo} alt={league.name} className="hidden h-12 w-auto light:block" />
       )}
       {title && (
         <p className="font-semibold text-zinc-100 leading-snug">{title}</p>

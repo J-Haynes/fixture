@@ -440,6 +440,15 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
     Image Optimization, so **resize PNG/JPG logos to at most 144 px before committing** (3× the largest 48 px
     display size).
   - TheSportsDB badges (`strBadge`) are a good source: download them, then `sharp().trim().resize(144, 144, { fit: 'inside' })`.
+  - **Logos are dark-first.** The app was dark-only until the Light theme, and many logos have white parts (white
+    text or outlines) that vanish on white. Check every new logo on a light card as well as a dark one.
+    - **Team logos:** in Light, `.team-logo` (on `TeamAvatar`) gets a faint outline in `globals.css`. That rescues the
+      All Blacks' fern but not logos that are mostly white line-work. For those, find a version made for light
+      backgrounds.
+    - **League logos:** these always sit on dark surfaces in every theme (the banners, and the Tables chips, which use
+      `neutral-*`). Keep it that way. Where one sits on the card itself (motorsport cards), Light swaps in a
+      light-background version from `LIGHT_BACKGROUND_LOGO` in `league-theme.ts` (only Supercars so far). For
+      theme-specific markup, use the `light:` variant from `globals.css`.
 - [next.config.ts](next.config.ts) sets a strict CSP (`img-src 'self' data: blob:`, `connect-src 'self'`). Remote
   images or API calls from the browser need CSP changes and `images.remotePatterns`.
 - The repo has both `README.md` (create-next-app boilerplate) and `readme.md` (`#SportsApp`). Those names collide on

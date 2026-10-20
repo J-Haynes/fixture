@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* light:… classes apply only in the Light theme (data-theme="light" on <html>) */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
 }

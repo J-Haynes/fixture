@@ -63,14 +63,16 @@ export function TableSelector({ tables, selected, onSelect }: {
             title={league.name}
             // Logos only; more leagues than fit scroll sideways
             className={`flex h-11 min-w-16 flex-1 items-center justify-center rounded-lg transition ${
-              active ? 'bg-zinc-700' : 'bg-zinc-800/60 opacity-60 grayscale hover:opacity-90 hover:grayscale-0'
+              // neutral, not zinc: league logos are dark-first (the Champions League's is white),
+              // so the chips stay dark in every theme, like the banners
+              active ? 'bg-neutral-700' : 'bg-neutral-800 opacity-60 grayscale hover:opacity-90 hover:grayscale-0'
             }`}
           >
             {league.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={league.logoUrl} alt="" className="max-h-7 max-w-12 object-contain" />
             ) : (
-              <span className="text-xs font-medium text-zinc-300">{league.shortName ?? league.name}</span>
+              <span className="text-xs font-medium text-neutral-300">{league.shortName ?? league.name}</span>
             )}
           </button>
         );
