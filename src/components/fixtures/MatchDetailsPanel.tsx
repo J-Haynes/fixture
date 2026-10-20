@@ -36,15 +36,15 @@ export function MatchDetailsPanel({ fixtureId }: { fixtureId: number }) {
   }, [fixtureId]);
 
   if (state.status === 'loading') {
-    return <p className="py-4 text-center text-xs text-zinc-500">Loading match details…</p>;
+    return <p className="py-4 text-center text-[13px] text-dim">Loading match details…</p>;
   }
   if (state.status === 'error') {
-    return <p className="py-4 text-center text-xs text-zinc-500">Couldn&apos;t load match details. Try again shortly.</p>;
+    return <p className="py-4 text-center text-[13px] text-dim">Couldn&apos;t load match details. Try again shortly.</p>;
   }
 
   const { events, stats } = state.details;
   if (events.length === 0 && stats.length === 0) {
-    return <p className="py-4 text-center text-xs text-zinc-500">No details yet. They usually arrive soon after full time.</p>;
+    return <p className="py-4 text-center text-[13px] text-dim">No details yet. They usually arrive soon after full time.</p>;
   }
 
   return (
@@ -52,9 +52,9 @@ export function MatchDetailsPanel({ fixtureId }: { fixtureId: number }) {
       {events.length > 0 && (
         <ol className="space-y-1.5" aria-label="Goals and red cards">
           {events.map((e, i) => (
-            <li key={i} className="grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-xs">
+            <li key={i} className="grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-[13px]">
               <span className="text-right">{e.side === 'home' && <EventLabel event={e} align="right" />}</span>
-              <span className="text-center tabular-nums text-zinc-500">{e.minute}&apos;</span>
+              <span className="text-center tabular-nums text-dim">{e.minute}&apos;</span>
               <span>{e.side === 'away' && <EventLabel event={e} align="left" />}</span>
             </li>
           ))}
@@ -69,15 +69,15 @@ export function MatchDetailsPanel({ fixtureId }: { fixtureId: number }) {
             const fmt = (n: number) => `${n}${s.percent ? '%' : ''}`;
             return (
               <div key={s.label}>
-                <div className="flex items-baseline justify-between text-xs tabular-nums">
-                  <dd className={s.home >= s.away ? 'font-semibold text-zinc-100' : 'text-zinc-400'}>{fmt(s.home)}</dd>
-                  <dt className="text-zinc-500">{s.label}</dt>
-                  <dd className={s.away >= s.home ? 'font-semibold text-zinc-100' : 'text-zinc-400'}>{fmt(s.away)}</dd>
+                <div className="flex items-baseline justify-between text-[13px] tabular-nums">
+                  <dd className={s.home >= s.away ? 'font-semibold text-chalk' : 'text-mist'}>{fmt(s.home)}</dd>
+                  <dt className="text-dim">{s.label}</dt>
+                  <dd className={s.away >= s.home ? 'font-semibold text-chalk' : 'text-mist'}>{fmt(s.away)}</dd>
                 </div>
                 {/* Neutral shades: more isn't always better (fouls, cards) */}
                 <div className="mt-1 flex h-1 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
-                  <span className={s.home >= s.away ? 'bg-zinc-300' : 'bg-zinc-700'} style={{ width: `${homeShare}%` }} />
-                  <span className={`flex-1 ${s.away >= s.home ? 'bg-zinc-300' : 'bg-zinc-700'}`} />
+                  <span className={s.home >= s.away ? 'bg-mist' : 'bg-line'} style={{ width: `${homeShare}%` }} />
+                  <span className={`flex-1 ${s.away >= s.home ? 'bg-mist' : 'bg-line'}`} />
                 </div>
               </div>
             );
@@ -105,9 +105,9 @@ function EventLabel({ event, align }: { event: MatchEvent; align: 'left' | 'righ
     <span className={`inline-flex items-center gap-1.5 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
       {icon}
       <span className={align === 'right' ? 'text-right' : ''}>
-        <span className={missed ? 'text-zinc-500' : 'text-zinc-200'}>{event.player}</span>
-        {tag && <span className="text-zinc-500"> ({tag})</span>}
-        {event.assist && <span className="block text-[11px] text-zinc-500">assist {event.assist}</span>}
+        <span className={missed ? 'text-dim' : 'text-chalk'}>{event.player}</span>
+        {tag && <span className="text-dim"> ({tag})</span>}
+        {event.assist && <span className="block text-[11px] text-dim">assist {event.assist}</span>}
       </span>
     </span>
   );

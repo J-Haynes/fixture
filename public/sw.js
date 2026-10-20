@@ -1,4 +1,4 @@
-const CACHE = 'fixture-v2';
+const CACHE = 'fixture-v3';
 
 // Only pre-cache the true app shell — static files that never change between deploys.
 // /_next/static/ assets are intentionally excluded: Next.js content-hashes them and

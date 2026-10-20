@@ -4,15 +4,17 @@ import { useState } from 'react';
 import Image from 'next/image';
 import type { Team } from '@/lib/types';
 
-// Deterministic colour per team — replaced by real logos when available.
+// Deterministic colour per team, for teams without a logo (shown as initials).
+// Muted so a logo-less team doesn't outshout the league bands.
 const COLOURS = [
-  'bg-blue-600',   'bg-red-600',    'bg-emerald-600', 'bg-purple-600',
-  'bg-amber-600',  'bg-indigo-600', 'bg-pink-600',    'bg-cyan-600',
-  'bg-orange-600', 'bg-teal-600',   'bg-violet-600',  'bg-rose-600',
+  'bg-blue-800',   'bg-red-800',    'bg-emerald-800', 'bg-purple-800',
+  'bg-amber-800',  'bg-indigo-800', 'bg-pink-800',    'bg-cyan-800',
+  'bg-orange-800', 'bg-teal-800',   'bg-violet-800',  'bg-rose-800',
 ];
 
 const SIZE_MAP = {
   xs: { px: 24, cls: 'w-6 h-6 text-[8px]'   },
+  row: { px: 28, cls: 'w-7 h-7 text-[9px]' },
   sm: { px: 32, cls: 'w-8 h-8 text-[10px]' },
   md: { px: 40, cls: 'w-10 h-10 text-xs'   },
   lg: { px: 48, cls: 'w-[48px] h-[48px] text-xs' },
@@ -37,7 +39,7 @@ export function TeamAvatar({ team, size = 'md' }: Props) {
         alt={team.name}
         width={px}
         height={px}
-        className={`${cls} rounded-lg object-contain`}
+        className={`${cls} shrink-0 object-contain`}
         // Logos in /public are pre-sized to 144px, so skip the image optimizer
         unoptimized
         onError={() => setImgError(true)}
@@ -47,7 +49,7 @@ export function TeamAvatar({ team, size = 'md' }: Props) {
 
   return (
     <div
-      className={`${cls} ${colour} rounded-lg flex items-center justify-center text-white font-bold shrink-0`}
+      className={`${cls} ${colour} rounded-full flex items-center justify-center text-white font-bold tracking-tight shrink-0`}
       aria-label={team.name}
     >
       {initials}

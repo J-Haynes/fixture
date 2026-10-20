@@ -1,7 +1,21 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-archivo);
+}
+
+/* Palette: a floodlit night ground. Gold marks what's yours (followed teams, the current
+   tab, actions); red is kept for live play only. League colours live in league-theme.ts. */
+@theme {
+  --color-night:   #121821; /* page ground */
+  --color-stand:   #1a2230; /* panels, the bars */
+  --color-stand-2: #232d3d; /* hover, raised controls */
+  --color-line:    #2a3444;
+  --color-chalk:   #eceff4; /* primary text */
+  --color-mist:    #a3adbd; /* secondary text */
+  --color-dim:     #7c879a; /* tertiary text (4.5:1 on night) */
+  --color-flood:   #f2c94c;
+  --color-live:    #ff5a4e;
 }
 
 /* Always show the scrollbar track, so the centred column and the fixed bottom bar don't jump
@@ -9,4 +23,22 @@
    enough: fixed elements ignore the reserved gutter. No effect with overlay scrollbars (phones). */
 html {
   overflow-y: scroll;
+  color-scheme: dark;
+}
+
+/* Archivo sets a little wide at text sizes; a touch of condensing tightens it */
+body {
+  font-stretch: 94%;
+}
+
+/* Scoreboard numerals and day headings: Archivo at its narrowest width */
+@utility scoreboard {
+  font-stretch: 62%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-flood);
+  outline-offset: 2px;
 }

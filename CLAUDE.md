@@ -53,12 +53,17 @@ nations are `rugby-<name>` (shared by all four rugby international competitions)
 - **Next.js 16.3 (App Router)**, React 19.2, TypeScript (strict). Next 16 differs from older versions; see AGENTS.md.
   The bundled docs at `node_modules/next/dist/docs/` only exist after `npm install`.
 - **Tailwind CSS v4** via `@tailwindcss/postcss` (no `tailwind.config`; styles in [src/app/globals.css](src/app/globals.css)).
-  Dark zinc palette, emerald accent.
+  The palette is tokens in `@theme` (`bg-night`, `bg-stand`, `text-chalk`/`mist`/`dim`, `border-line`): a dark
+  blue-slate ground with **gold (`flood`) for what's the viewer's own** (followed teams, the current tab, actions)
+  and **red (`live`) for live play only**. Each league's flat brand colour (`leagueColour`) is the one loud element;
+  keep everything else quiet.
 - **Drizzle ORM** + **postgres.js** against **Supabase Postgres** (pooler, so `prepare: false` in [src/db/index.ts](src/db/index.ts)).
 - **Vercel** hosting (team `jhaynes-projects`, project `fixture`). The account is on Pro, but the app is built to fit
   the **Hobby** plan (see **Hosting costs**). The sync is scheduled by **Supabase pg_cron**
   ([supabase/cron.sql](supabase/cron.sql)); [vercel.json](vercel.json) keeps only a daily backup cron.
-- Font: Geist via `next/font/google` (self-hosted at build).
+- Font: **Archivo** via `next/font/google` with its `wdth` axis (self-hosted at build). One family; the width
+  carries the hierarchy. The `scoreboard` utility in `globals.css` (62% width, tabular numerals) is for kickoff
+  times, scores and day headings; body text is set at 94%.
 - No test framework is set up. Changes have been verified with `typecheck`/`lint`, a production build, and headless
   Playwright scripts against `next start` (kept outside the repo).
 
@@ -136,15 +141,20 @@ breaks hydration (React #418).
   - **Skeleton first:** the server render and hydration show `FeedSkeleton` instead of the feed (`isClient` false).
     The feed renders right after, already grouped by local day with local kickoff times, filters and the saved
     tab applied. An earlier version rendered UTC times and days first, which visibly jumped on load; don't
-    reintroduce viewer-dependent content into the server render. `DateGroup`/`FixtureCard` are client-only.
+    reintroduce viewer-dependent content into the server render. `DateGroup`/`FixtureRow` are client-only, and
+    `FeedSkeleton` mirrors their layout, so update it with them.
   - **Refresh:** while any fixture is live (or past kickoff but still `scheduled`), it calls `router.refresh()` every
     2 min while the tab is visible. It also refreshes when the tab or PWA comes back after more than 5 min. Both
     re-request the ISR-cached route; keep any future polling on cached data too.
-- **[src/components/fixtures/FixtureCard.tsx](src/components/fixtures/FixtureCard.tsx)**: banner colours come from
-  `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts) (shared with the menu). It uses
-  `TeamMatchLayout` when both teams exist and `EventLayout` otherwise (motorsport: event name + podium from
-  `sportMeta`). In results, the loser's name and score are grey (a draw keeps both white). Followed teams get an
-  emerald star badge on the logo's corner (`TeamSide`, via `usePreferences`). Finished games get a `ResultFooter`:
+- **[src/components/fixtures/DateGroup.tsx](src/components/fixtures/DateGroup.tsx)**: one day, under a sticky
+  day heading ("Today" / weekday, then the date). Within the day, games are grouped **by league**, under a
+  `LeagueBand` ([src/components/ui/LeagueBand.tsx](src/components/ui/LeagueBand.tsx): the league's flat colour
+  from `leagueColour(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts), shared with the menu and the
+  Tables tab). Leagues are ordered by their first game that day; a round shared by the whole block goes on the band.
+- **[src/components/fixtures/FixtureRow.tsx](src/components/fixtures/FixtureRow.tsx)**: one game as a row: kickoff
+  time (or Live/FT/Postponed/Cancelled) on the left, the two teams stacked with their scores (`TeamLines`), or the
+  event name and podium for motorsport (`EventLines`). In results, the loser's name and score are dimmed (a draw keeps
+  both bright). Followed teams get a gold star badge on the logo's corner (via `usePreferences`). Finished games get `ResultActions`:
   a **Highlights** link (`sportMeta.video`, when there is one) and, for football, a **Match details** toggle that
   opens `MatchDetailsPanel`, which fetches `/api/fixtures/[id]/details` on first open (see **Match details**).
 - **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. It shows one

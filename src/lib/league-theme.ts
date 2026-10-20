@@ -1,31 +1,25 @@
-// Two-tone gradients drawn from each league's actual brand palette, shared by the
-// fixture cards and the league list in the menu.
-// from- = primary brand colour (darkened), to- = secondary/background tone.
-export interface LeagueBanner {
-  strip:   string;
-  divider: string;
-  text:    string;
-}
-
-const LEAGUE_BANNER: Record<string, LeagueBanner> = {
-  'nrl':                 { strip: 'bg-gradient-to-r from-zinc-950 to-green-900',   divider: 'border-green-800/50',   text: 'text-white/85' },
-  'super-rugby-pacific': { strip: 'bg-gradient-to-r from-blue-950 to-teal-900',    divider: 'border-teal-800/50',    text: 'text-white/85' },
-  'fifa-world-cup':      { strip: 'bg-gradient-to-r from-zinc-950 to-yellow-500',  divider: 'border-amber-700/50',   text: 'text-white/85' },
-  'formula-1':           { strip: 'bg-gradient-to-r from-zinc-950 to-red-900',     divider: 'border-red-800/50',     text: 'text-white/85' },
-  'v8-supercars':        { strip: 'bg-gradient-to-r from-zinc-950 to-orange-900',  divider: 'border-orange-800/50',  text: 'text-white/85' },
-  'afl':                 { strip: 'bg-gradient-to-r from-blue-950 to-red-800',     divider: 'border-red-800/50',     text: 'text-white/85' },
-  'a-league-men':        { strip: 'bg-gradient-to-r from-zinc-950 to-rose-700',    divider: 'border-rose-800/50',    text: 'text-white/85' },
-  'champions-league':    { strip: 'bg-gradient-to-r from-slate-950 to-blue-800',  divider: 'border-blue-800/50',    text: 'text-white/85' },
-  'premier-league':      { strip: 'bg-gradient-to-r from-purple-950 to-fuchsia-800', divider: 'border-fuchsia-800/50', text: 'text-white/85' },
-  'nba':                 { strip: 'bg-gradient-to-r from-blue-900 to-red-700',     divider: 'border-red-800/50',     text: 'text-white/85' },
-  'nations-championship':{ strip: 'bg-gradient-to-r from-zinc-950 to-lime-700',    divider: 'border-lime-800/50',    text: 'text-white/85' },
-  'rugby-championship':  { strip: 'bg-gradient-to-r from-zinc-950 to-sky-800',     divider: 'border-sky-800/50',     text: 'text-white/85' },
-  'rugby-world-cup':     { strip: 'bg-gradient-to-r from-zinc-950 to-orange-700',  divider: 'border-orange-800/50',  text: 'text-white/85' },
-  'all-blacks-tests':    { strip: 'bg-gradient-to-r from-black to-zinc-700',       divider: 'border-zinc-600/50',    text: 'text-white/85' },
+// One flat colour per league, taken from its own branding and darkened where needed so
+// white text and the league's logo read on it (white text is at least 4.5:1 on all of them).
+// Used for the league bands in the feed, the menu and the Tables tab.
+const LEAGUE_COLOUR: Record<string, string> = {
+  'nrl':                  '#0b6b3a',
+  'super-rugby-pacific':  '#13406b',
+  'fifa-world-cup':       '#7a5c10',
+  'formula-1':            '#3a0b0b', // the logo is F1 red, so the band is the dark end of it
+  'v8-supercars':         '#9a3412',
+  'afl':                  '#0a2f6e',
+  'a-league-men':         '#a8113c',
+  'champions-league':     '#0d1e57',
+  'premier-league':       '#3d195b',
+  'nba':                  '#1d428a',
+  'nations-championship': '#3f6212',
+  'rugby-championship':   '#075985',
+  'rugby-world-cup':      '#0f766e',
+  'all-blacks-tests':     '#000000',
 };
 
-const DEFAULT_BANNER: LeagueBanner = { strip: 'bg-zinc-800/60', divider: 'border-zinc-800', text: 'text-zinc-400' };
+const DEFAULT_COLOUR = '#232d3d'; // stand-2
 
-export function leagueBanner(slug: string): LeagueBanner {
-  return LEAGUE_BANNER[slug] ?? DEFAULT_BANNER;
+export function leagueColour(slug: string): string {
+  return LEAGUE_COLOUR[slug] ?? DEFAULT_COLOUR;
 }

@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { subscribeClock, getClock } from '@/lib/clock';
-import { formatKickoffTime, formatShortDate } from '@/lib/dates';
+import { formatKickoffParts, formatShortDate } from '@/lib/dates';
 
 /**
  * Today's date and the current time, in the viewer's timezone. The page HTML is
@@ -14,10 +14,14 @@ export function HeaderClock() {
   if (now == null) return <div className="h-8 w-16" aria-hidden="true" />;
 
   const date = new Date(now);
+  const { time, period } = formatKickoffParts(date.toISOString());
   return (
     <time dateTime={date.toISOString()} className="flex flex-col items-end leading-tight tabular-nums">
-      <span className="text-xs font-medium text-zinc-300">{formatShortDate(date)}</span>
-      <span className="text-xs text-zinc-500">{formatKickoffTime(date.toISOString())}</span>
+      <span className="text-chalk">
+        <span className="scoreboard text-[19px] font-bold">{time}</span>
+        {period && <span className="ml-0.5 text-xs text-mist">{period}</span>}
+      </span>
+      <span className="text-xs text-mist">{formatShortDate(date)}</span>
     </time>
   );
 }

@@ -11,6 +11,12 @@ import { DateGroup } from './DateGroup';
 import { FeedSkeleton } from './FeedSkeleton';
 import { LeagueTables, TableSelector } from '@/components/tables/LeagueTables';
 
+const VIEWS: { value: View; label: string }[] = [
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'results',  label: 'Results'  },
+  { value: 'tables',   label: 'Tables'   },
+];
+
 const UPCOMING_STATUSES = new Set(['scheduled', 'live', 'postponed', 'cancelled']);
 
 // A scheduled game that kicked off over 10 minutes ago should have been marked live by
@@ -98,49 +104,46 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
   return (
     <>
       {/* Scrollable feed — padding-bottom clears the fixed bottom nav (and the table selector above it) */}
-      <div className={`${showSelector ? 'pb-36' : 'pb-24'} max-w-lg mx-auto w-full px-4 py-5`}>
+      <div className={`${showSelector ? 'pb-40' : 'pb-24'} max-w-lg mx-auto w-full px-4 pt-1`}>
         {!isClient ? (
           <FeedSkeleton />
         ) : view === 'tables' ? (
           <LeagueTables tables={visibleTables} selected={selectedTable} anyTables={tables.length > 0} />
         ) : grouped.length === 0 ? (
-          <div className="text-center py-20 text-zinc-600">
-            <p className="text-4xl mb-3">📭</p>
-            <p className="font-medium text-zinc-500">
-              {view === 'upcoming' ? 'No upcoming fixtures' : 'No recent results'}
+          <div className="py-20 text-center">
+            <p className="scoreboard text-[34px] font-extrabold text-chalk">
+              {view === 'upcoming' ? 'Nothing scheduled' : 'No results yet'}
             </p>
-            {filteredOut > 0 && (
-              <p className="mt-2 text-sm text-zinc-600">
-                Your filters are hiding {filteredOut} {filteredOut === 1 ? 'fixture' : 'fixtures'}. Change them in the menu.
-              </p>
-            )}
+            <p className="mx-auto mt-3 max-w-xs text-[15px] leading-snug text-mist">
+              {filteredOut > 0
+                ? `Your filters are hiding ${filteredOut} ${filteredOut === 1 ? 'game' : 'games'}. Change them in the menu.`
+                : view === 'upcoming'
+                  ? 'No games in the next two weeks for the leagues you follow.'
+                  : 'No games finished in the last two weeks for the leagues you follow.'}
+            </p>
             {prefs.hiddenLeagues.length > 0 && (
               <button
                 type="button"
                 onClick={showAllLeagues}
-                className="mt-3 text-sm font-medium text-emerald-400 hover:text-emerald-300"
+                className="mt-5 rounded-full bg-flood px-4 py-2 text-sm font-semibold text-night hover:bg-flood/90"
               >
                 Show all leagues
               </button>
             )}
           </div>
         ) : (
-          grouped.map(([dateKey, dayFixtures], i) => (
-            <div key={dateKey}>
-              {i > 0 && (
-                <div className="flex justify-center my-7">
-                  <div className="h-px bg-zinc-800 w-4/5" />
-                </div>
-              )}
-              <DateGroup dateKey={dateKey} fixtures={dayFixtures} />
-            </div>
-          ))
+          <div className="space-y-8">
+            {grouped.map(([dateKey, dayFixtures]) => (
+              <DateGroup key={dateKey} dateKey={dateKey} fixtures={dayFixtures} />
+            ))}
+          </div>
         )}
       </div>
 
       {/* Fixed bottom navigation */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-20 bg-zinc-900 border-t border-zinc-800"
+        aria-label="Views"
+        className="fixed bottom-0 inset-x-0 z-20 border-t border-line bg-stand"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {showSelector && (
@@ -149,19 +152,24 @@ export function FixtureFeed({ fixtures, tables, renderedAt }: Props) {
           </div>
         )}
         <div className="flex max-w-lg mx-auto">
-          {(['upcoming', 'results', 'tables'] as View[]).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`flex-1 py-4 text-sm font-medium capitalize transition-colors ${
-                view === v
-                  ? 'text-emerald-400'
-                  : 'text-zinc-500 hover:text-zinc-400'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
+          {VIEWS.map(({ value, label }) => {
+            const current = view === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setView(value)}
+                aria-current={current ? 'page' : undefined}
+                // The gold rule on top marks the current view
+                className={`relative flex-1 py-4 text-[15px] font-semibold transition-colors ${
+                  current ? 'text-chalk' : 'text-dim hover:text-mist'
+                }`}
+              >
+                {current && <span aria-hidden="true" className="absolute inset-x-6 top-0 h-[3px] rounded-b bg-flood" />}
+                {label}
+              </button>
+            );
+          })}
         </div>
       </nav>
     </>

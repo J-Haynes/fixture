@@ -59,7 +59,7 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
         aria-label="Open menu"
         aria-expanded={open}
         aria-controls="nav-drawer"
-        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-chalk hover:bg-stand-2"
       >
         <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <path d="M4 6h16M4 12h16M4 18h16" />
@@ -71,7 +71,7 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
           <div
             onClick={() => setOpen(false)}
             aria-hidden="true"
-            className={`absolute inset-0 bg-black/60 transition-opacity duration-200 motion-reduce:transition-none ${
+            className={`absolute inset-0 bg-black/55 transition-opacity duration-200 motion-reduce:transition-none ${
               open ? 'opacity-100' : 'opacity-0'
             }`}
           />
@@ -81,19 +81,19 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
             role="dialog"
             aria-modal="true"
             aria-label="Menu"
-            className={`absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-zinc-900 border-r border-zinc-800 shadow-2xl shadow-black/50 transition-transform duration-200 motion-reduce:transition-none ${
+            className={`absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-stand shadow-2xl shadow-black/50 transition-transform duration-200 motion-reduce:transition-none ${
               open ? 'translate-x-0' : '-translate-x-full'
             }`}
             style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <div className="flex h-14 items-center justify-between border-b border-zinc-800 px-4">
-              <span className="font-semibold text-zinc-100">Menu</span>
+            <div className="flex h-14 items-center justify-between border-b border-line px-4">
+              <span className="text-[17px] font-semibold text-chalk">Menu</span>
               <button
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
-                className="-mr-2 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                className="-mr-2 flex h-10 w-10 items-center justify-center rounded-lg text-mist hover:bg-stand-2 hover:text-chalk"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                   <path d="M6 6l12 12M18 6L6 18" />
@@ -105,11 +105,11 @@ export function NavDrawer({ leagues }: { leagues: League[] }) {
               <LeagueFilterList leagues={leagues} />
             </nav>
 
-            <div className="border-t border-zinc-800 p-2">
+            <div className="border-t border-line p-2">
               {/* Placeholder: no settings page yet */}
               <button
                 type="button"
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium text-mist hover:bg-stand-2 hover:text-chalk"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="3" />

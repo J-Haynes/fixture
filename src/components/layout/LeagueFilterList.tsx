@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { League, Team } from '@/lib/types';
-import { leagueBanner } from '@/lib/league-theme';
+import { leagueColour } from '@/lib/league-theme';
 import { getSportEmoji } from '@/lib/sports';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import {
@@ -35,10 +35,10 @@ export function LeagueFilterList({ leagues }: Props) {
 
   return (
     <>
-      <section className="border-b border-zinc-800 p-4">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">My teams</h2>
+      <section className="border-b border-line p-4">
+        <h2 className="mb-3 text-[15px] font-semibold text-chalk">My teams</h2>
         {myTeams.length === 0 ? (
-          <p className="text-sm leading-snug text-zinc-500">
+          <p className="text-sm leading-snug text-mist">
             Open a league below to follow teams. They show up in every competition they play in.
           </p>
         ) : (
@@ -48,12 +48,12 @@ export function LeagueFilterList({ leagues }: Props) {
 
       <section className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Leagues</h2>
+          <h2 className="text-[15px] font-semibold text-chalk">Leagues</h2>
           {anyHidden && (
             <button
               type="button"
               onClick={showAllLeagues}
-              className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
+              className="text-sm font-medium text-flood hover:text-flood/80"
             >
               Show all
             </button>
@@ -63,7 +63,6 @@ export function LeagueFilterList({ leagues }: Props) {
         <ul className="space-y-2">
           {leagues.map(league => {
             const on = !hidden.has(league.slug);
-            const banner = leagueBanner(league.slug);
             const label = league.shortName ?? league.name;
             // A league of one team's games (All Blacks Tests) has nothing to filter, so no chevron
             const teams = hasTeamFilter(league.slug) ? league.teams ?? [] : [];
@@ -72,11 +71,12 @@ export function LeagueFilterList({ leagues }: Props) {
             const panelId = `league-teams-${league.slug}`;
 
             return (
-              <li key={league.slug} className={`overflow-hidden rounded-xl border ${banner.divider}`}>
+              <li key={league.slug} className="overflow-hidden rounded-xl bg-night">
                 <div
-                  className={`flex items-center gap-1 pl-3 pr-1 ${banner.strip} transition-opacity ${
+                  className={`flex items-center gap-1 pl-3 pr-1 text-white transition-opacity ${
                     on ? '' : 'opacity-45 grayscale'
                   }`}
+                  style={{ backgroundColor: leagueColour(league.slug) }}
                 >
                   <button
                     type="button"
@@ -94,11 +94,12 @@ export function LeagueFilterList({ leagues }: Props) {
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className={`line-clamp-2 text-sm font-medium leading-tight ${banner.text}`}>{label}</span>
+                      <span className="line-clamp-2 text-[15px] font-semibold leading-tight">{label}</span>
                       {teams.length > 0 && mode === 'mine' && (
-                        <span className="block text-[11px] leading-tight text-white/60">My teams only</span>
+                        <span className="block text-xs leading-tight text-white/70">My teams only</span>
                       )}
                     </span>
+                    <Switch on={on} colour={leagueColour(league.slug)} />
                   </button>
 
                   {teams.length > 0 && (
@@ -108,7 +109,7 @@ export function LeagueFilterList({ leagues }: Props) {
                       aria-label={`${isExpanded ? 'Hide' : 'Show'} ${label} teams`}
                       aria-expanded={isExpanded}
                       aria-controls={panelId}
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${banner.text} hover:bg-white/10`}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white/85 hover:bg-white/10"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -122,7 +123,7 @@ export function LeagueFilterList({ leagues }: Props) {
                 </div>
 
                 {isExpanded && (
-                  <div id={panelId} className="space-y-3 bg-zinc-900 p-3">
+                  <div id={panelId} className="space-y-3 p-3">
                     <ModeToggle mode={mode} onChange={m => setLeagueMode(league.slug, m)} label={label} />
                     <ul className="grid grid-cols-1 gap-1">
                       {teams.map(team => {
@@ -133,10 +134,10 @@ export function LeagueFilterList({ leagues }: Props) {
                               type="button"
                               aria-pressed={isFollowed}
                               onClick={() => toggleTeam(team.slug)}
-                              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-zinc-800"
+                              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-stand-2"
                             >
                               <TeamAvatar team={team} size="xs" />
-                              <span className={`min-w-0 flex-1 truncate text-sm ${isFollowed ? 'font-medium text-zinc-100' : 'text-zinc-400'}`}>
+                              <span className={`min-w-0 flex-1 truncate text-sm ${isFollowed ? 'font-medium text-chalk' : 'text-mist'}`}>
                                 {team.name}
                               </span>
                               <Star filled={isFollowed} />
@@ -201,17 +202,17 @@ function MyTeamsList({ teams }: { teams: Team[] }) {
                 type="button"
                 onClick={() => toggleTeam(team.slug)}
                 aria-label={`Unfollow ${team.name}`}
-                className="flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-800 py-1 pl-1 pr-2.5 text-xs font-medium text-zinc-200 hover:border-zinc-600"
+                className="flex items-center gap-2 rounded-full bg-stand-2 py-1 pl-1 pr-2.5 text-[13px] font-medium text-chalk ring-1 ring-flood/40 hover:ring-flood"
               >
                 <TeamAvatar team={team} size="xs" />
                 {team.name}
-                <span aria-hidden="true" className="text-zinc-500">✕</span>
+                <span aria-hidden="true" className="text-dim">✕</span>
               </button>
             </li>
           ))}
         </ul>
         {collapsed && (
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-b from-transparent to-zinc-900" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-b from-transparent to-stand" />
         )}
       </div>
 
@@ -221,7 +222,7 @@ function MyTeamsList({ teams }: { teams: Team[] }) {
           onClick={() => setShowAll(v => !v)}
           aria-expanded={showAll}
           aria-controls="my-teams-list"
-          className="mt-2 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+          className="mt-2.5 text-sm font-medium text-flood hover:text-flood/80"
         >
           {showAll ? 'Show less' : `Show all ${teams.length} teams`}
         </button>
@@ -236,7 +237,7 @@ function ModeToggle({ mode, onChange, label }: { mode: LeagueMode; onChange: (m:
     { value: 'mine', text: 'My teams only' },
   ];
   return (
-    <div role="radiogroup" aria-label={`${label} games to show`} className="grid grid-cols-2 gap-1 rounded-lg bg-zinc-800 p-1">
+    <div role="radiogroup" aria-label={`${label} games to show`} className="grid grid-cols-2 gap-1 rounded-lg bg-stand p-1">
       {options.map(o => (
         <button
           key={o.value}
@@ -244,8 +245,8 @@ function ModeToggle({ mode, onChange, label }: { mode: LeagueMode; onChange: (m:
           role="radio"
           aria-checked={mode === o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-md py-1.5 text-xs font-medium transition-colors ${
-            mode === o.value ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-zinc-200'
+          className={`rounded-md py-1.5 text-[13px] font-medium transition-colors ${
+            mode === o.value ? 'bg-stand-2 text-chalk shadow-sm' : 'text-mist hover:text-chalk'
           }`}
         >
           {o.text}
@@ -259,11 +260,26 @@ function Star({ filled }: { filled: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-4 w-4 shrink-0 ${filled ? 'text-emerald-400' : 'text-zinc-600'}`}
+      className={`h-4 w-4 shrink-0 ${filled ? 'text-flood' : 'text-dim'}`}
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"
     >
       <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
     </svg>
+  );
+}
+
+/** The on/off look of a league row (the row itself is the switch) */
+function Switch({ on, colour }: { on: boolean; colour: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none ${on ? 'bg-white' : 'bg-white/25'}`}
+    >
+      <span
+        className={`absolute top-0.5 h-4 w-4 rounded-full transition-[left] motion-reduce:transition-none ${on ? 'left-[18px]' : 'left-0.5 bg-white/80'}`}
+        style={on ? { backgroundColor: colour } : undefined}
+      />
+    </span>
   );
 }

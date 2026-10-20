@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist } from 'next/font/google';
+import { Archivo } from 'next/font/google';
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import './globals.css';
 
-const geist = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
+// One family: the width axis carries the hierarchy (condensed scoreboard numerals, normal-width names)
+const archivo = Archivo({
+  variable: '--font-archivo',
+  subsets:  ['latin', 'latin-ext'],
+  axes:     ['wdth'],
 });
 
 export const metadata: Metadata = {
@@ -21,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#09090b',
+  themeColor: '#1a2230',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -30,8 +32,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={geist.variable}>
-      <body className="min-h-screen bg-zinc-950 font-sans antialiased text-zinc-100">
+    <html lang="en" className={archivo.variable}>
+      <body className="min-h-screen bg-night font-sans antialiased text-chalk">
         <ServiceWorkerRegistration />
         {children}
         <InstallPrompt />

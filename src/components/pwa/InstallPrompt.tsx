@@ -53,7 +53,7 @@ export function InstallPrompt() {
 
   return (
     <div
-      className="fixed left-4 right-4 z-30 flex items-center gap-3 rounded-xl bg-zinc-800 border border-zinc-700 px-4 py-3 shadow-xl shadow-black/40"
+      className="fixed left-4 right-4 z-30 flex items-center gap-3 rounded-xl bg-stand-2 border border-line px-4 py-3 shadow-xl shadow-black/40"
       // Sits just above the bottom nav, accounting for safe-area on notched phones
       style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
       role="banner"
@@ -62,18 +62,18 @@ export function InstallPrompt() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icon.svg" alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg" />
 
-      <p className="flex-1 text-sm text-zinc-200 leading-snug">
+      <p className="flex-1 text-sm text-chalk leading-snug">
         {state === 'ios' ? (
           <>
             Tap{' '}
-            <span className="font-medium text-zinc-100">⬆ Share</span>
+            <span className="font-medium text-chalk">⬆ Share</span>
             {' '}then{' '}
-            <span className="font-medium text-zinc-100">&ldquo;Add to Home Screen&rdquo;</span>
+            <span className="font-medium text-chalk">&ldquo;Add to Home Screen&rdquo;</span>
           </>
         ) : (
           <>
             Add{' '}
-            <span className="font-medium text-zinc-100">Fixture</span>
+            <span className="font-medium text-chalk">Fixture</span>
             {' '}to your home screen
           </>
         )}
@@ -82,7 +82,7 @@ export function InstallPrompt() {
       {state === 'android' && (
         <button
           onClick={install}
-          className="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+          className="shrink-0 rounded-full bg-flood hover:bg-flood/90 px-3.5 py-1.5 text-[13px] font-semibold text-night transition-colors"
         >
           Add
         </button>
@@ -90,7 +90,7 @@ export function InstallPrompt() {
 
       <button
         onClick={dismiss}
-        className="shrink-0 rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700 transition-colors"
+        className="shrink-0 rounded-lg p-1.5 text-dim hover:text-chalk hover:bg-line transition-colors"
         aria-label="Dismiss"
       >
         ✕

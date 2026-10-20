@@ -9,8 +9,8 @@
     "standalone",
     "minimal-ui"
   ],
-  "background_color": "#0b0b12",
-  "theme_color": "#09090b",
+  "background_color": "#121821",
+  "theme_color": "#1a2230",
   "orientation": "portrait-primary",
   "icons": [
     {
