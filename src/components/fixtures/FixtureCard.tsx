@@ -158,7 +158,7 @@ function TeamMatchLayout({ homeTeam, awayTeam, scheduledAt, status, homeScore, a
   );
 }
 
-/** One side of a match. Followed teams get an emerald star badge on the logo's corner. */
+/** One side of a match. Followed teams get a gold star badge on the logo's corner. */
 function TeamSide({ team, isLoser, isFollowed }: { team: Team; isLoser: boolean; isFollowed: boolean }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-1.5">
@@ -167,9 +167,9 @@ function TeamSide({ team, isLoser, isFollowed }: { team: Team; isLoser: boolean;
         {isFollowed && (
           <span
             aria-hidden="true"
-            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-zinc-900"
+            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#f2c94c] ring-2 ring-zinc-900"
           >
-            <svg viewBox="0 0 24 24" className="h-3 w-3 text-white" fill="currentColor">
+            <svg viewBox="0 0 24 24" className="h-3 w-3 text-[#121821]" fill="currentColor">
               <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
             </svg>
           </span>
@@ -199,9 +199,9 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
       return (
         <>
           <div className="flex items-center gap-1.5">
-            <span className={`text-2xl font-bold tabular-nums ${homeLost ? 'text-zinc-400' : 'text-white'}`}>{homeScore}</span>
+            <span className={`text-2xl font-bold tabular-nums ${homeLost ? 'text-zinc-400' : 'text-zinc-50'}`}>{homeScore}</span>
             <span className="text-zinc-600 text-lg">–</span>
-            <span className={`text-2xl font-bold tabular-nums ${awayLost ? 'text-zinc-400' : 'text-white'}`}>{awayScore}</span>
+            <span className={`text-2xl font-bold tabular-nums ${awayLost ? 'text-zinc-400' : 'text-zinc-50'}`}>{awayScore}</span>
           </div>
           <StatusBadge status="finished" />
         </>
@@ -212,9 +212,9 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
         <>
           {homeScore != null && awayScore != null && (
             <div className="flex items-center gap-1.5">
-              <span className="text-2xl font-bold text-white tabular-nums">{homeScore}</span>
+              <span className="text-2xl font-bold text-zinc-50 tabular-nums">{homeScore}</span>
               <span className="text-zinc-600 text-lg">–</span>
-              <span className="text-2xl font-bold text-white tabular-nums">{awayScore}</span>
+              <span className="text-2xl font-bold text-zinc-50 tabular-nums">{awayScore}</span>
             </div>
           )}
           <StatusBadge status="live" />
