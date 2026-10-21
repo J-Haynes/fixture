@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* light:… classes apply only in the Light theme (data-theme="light" on <html>) */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
 }
@@ -9,4 +12,47 @@
    enough: fixed elements ignore the reserved gutter. No effect with overlay scrollbars (phones). */
 html {
   overflow-y: scroll;
+}
+
+/* Colour themes (Settings; src/lib/theme.ts). Dark is Tailwind's own zinc. The others re-point
+   the zinc ramp by role rather than by shade: 950 is the page, 900 the cards, 800 borders and
+   chips, 500 to 100 text from faint to strong. A component styled with zinc-* follows the theme;
+   league banners use neutral-* and brand colours so they look the same in every theme. */
+:root[data-theme='blue'] {
+  color-scheme: dark;
+  --color-zinc-50:  #f6f8fb;
+  --color-zinc-100: #eceff4;
+  --color-zinc-200: #dde2ea;
+  --color-zinc-300: #c6cdd8;
+  --color-zinc-400: #a3adbd;
+  --color-zinc-500: #8390a6;
+  --color-zinc-600: #5d6b85;
+  --color-zinc-700: #33415c;
+  --color-zinc-800: #24314a;
+  --color-zinc-900: #192438;
+  --color-zinc-950: #111a2b;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-zinc-50:  #0b0b0d;
+  --color-zinc-100: #18191d;
+  --color-zinc-200: #27292f;
+  --color-zinc-300: #3c3f47;
+  --color-zinc-400: #4f525b;
+  --color-zinc-500: #62656e;
+  --color-zinc-600: #73767f;
+  --color-zinc-700: #c9ccd2;
+  --color-zinc-800: #e2e4e8;
+  --color-zinc-900: #ffffff;
+  --color-zinc-950: #f4f5f7;
+  /* The accent, darkened to read on white */
+  --color-emerald-300: #065f46;
+  --color-emerald-400: #047857;
+}
+
+/* Some team logos are drawn for dark backgrounds (the All Blacks' white fern); a faint
+   outline keeps them visible on light cards */
+:root[data-theme='light'] .team-logo {
+  filter: drop-shadow(0 0 0.5px rgb(0 0 0 / 0.7)) drop-shadow(0 0 1px rgb(0 0 0 / 0.25));
 }

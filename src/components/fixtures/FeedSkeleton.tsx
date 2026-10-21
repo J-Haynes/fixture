@@ -9,7 +9,10 @@ export function FeedSkeleton() {
       <span className="sr-only">Loading fixtures</span>
       {[3, 2].map((cards, g) => (
         <section key={g} className={g > 0 ? 'mt-14' : undefined} aria-hidden="true">
-          <div className="h-3 w-20 rounded bg-zinc-800 mb-3" />
+          {/* Matches DateGroup's heading */}
+          <div className="mb-1 py-3">
+            <div className="h-6 w-44 rounded bg-zinc-800" />
+          </div>
           <div className="space-y-3">
             {Array.from({ length: cards }, (_, i) => (
               <div key={i} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">

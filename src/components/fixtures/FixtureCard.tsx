@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TeamAvatar } from '@/components/ui/TeamAvatar';
 import { getSportEmoji } from '@/lib/sports';
 import { formatKickoffTime } from '@/lib/dates';
-import { leagueBanner } from '@/lib/league-theme';
+import { leagueBanner, leagueLogoForLight } from '@/lib/league-theme';
 import { usePreferences } from '@/lib/preferences';
 import { MatchDetailsPanel } from './MatchDetailsPanel';
 
@@ -158,7 +158,7 @@ function TeamMatchLayout({ homeTeam, awayTeam, scheduledAt, status, homeScore, a
   );
 }
 
-/** One side of a match. Followed teams get an emerald star badge on the logo's corner. */
+/** One side of a match. Followed teams get a gold star badge on the logo's corner. */
 function TeamSide({ team, isLoser, isFollowed }: { team: Team; isLoser: boolean; isFollowed: boolean }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-1.5">
@@ -167,9 +167,9 @@ function TeamSide({ team, isLoser, isFollowed }: { team: Team; isLoser: boolean;
         {isFollowed && (
           <span
             aria-hidden="true"
-            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-zinc-900"
+            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#f2c94c] ring-2 ring-zinc-900"
           >
-            <svg viewBox="0 0 24 24" className="h-3 w-3 text-white" fill="currentColor">
+            <svg viewBox="0 0 24 24" className="h-3 w-3 text-[#121821]" fill="currentColor">
               <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
             </svg>
           </span>
@@ -199,9 +199,9 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
       return (
         <>
           <div className="flex items-center gap-1.5">
-            <span className={`text-2xl font-bold tabular-nums ${homeLost ? 'text-zinc-400' : 'text-white'}`}>{homeScore}</span>
+            <span className={`text-2xl font-bold tabular-nums ${homeLost ? 'text-zinc-400' : 'text-zinc-50'}`}>{homeScore}</span>
             <span className="text-zinc-600 text-lg">–</span>
-            <span className={`text-2xl font-bold tabular-nums ${awayLost ? 'text-zinc-400' : 'text-white'}`}>{awayScore}</span>
+            <span className={`text-2xl font-bold tabular-nums ${awayLost ? 'text-zinc-400' : 'text-zinc-50'}`}>{awayScore}</span>
           </div>
           <StatusBadge status="finished" />
         </>
@@ -212,9 +212,9 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
         <>
           {homeScore != null && awayScore != null && (
             <div className="flex items-center gap-1.5">
-              <span className="text-2xl font-bold text-white tabular-nums">{homeScore}</span>
+              <span className="text-2xl font-bold text-zinc-50 tabular-nums">{homeScore}</span>
               <span className="text-zinc-600 text-lg">–</span>
-              <span className="text-2xl font-bold text-white tabular-nums">{awayScore}</span>
+              <span className="text-2xl font-bold text-zinc-50 tabular-nums">{awayScore}</span>
             </div>
           )}
           <StatusBadge status="live" />
@@ -236,7 +236,7 @@ function CentreDisplay({ status, scheduledAt, homeScore, awayScore }: CentreProp
 // ── Non-team event layout (motorsport, etc.) ────────────────────────────────
 
 interface EventLayoutProps {
-  league: { logoUrl?: string | null; name: string };
+  league: { logoUrl?: string | null; name: string; slug: string };
   round?: string | null;
   scheduledAt: string;
   status: Fixture['status'];
@@ -250,12 +250,18 @@ function EventLayout({ league, round, scheduledAt, status, sportMeta }: EventLay
   const eventName = typeof sportMeta?.eventName === 'string' ? sportMeta.eventName : undefined;
   // Session type ("Qualifying", "Race") is already shown in the banner strip — body shows race name only
   const title = eventName ?? round;
+  // The logo sits on the card here, so the Light theme uses a light-background version if there is one
+  const lightLogo = leagueLogoForLight(league.slug);
 
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       {league.logoUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={league.logoUrl} alt={league.name} className="h-12 w-auto" />
+        <img src={league.logoUrl} alt={league.name} className={`h-12 w-auto ${lightLogo ? 'light:hidden' : ''}`} />
+      )}
+      {lightLogo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={lightLogo} alt={league.name} className="hidden h-12 w-auto light:block" />
       )}
       {title && (
         <p className="font-semibold text-zinc-100 leading-snug">{title}</p>

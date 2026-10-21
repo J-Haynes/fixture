@@ -37,7 +37,7 @@ export function TeamAvatar({ team, size = 'md' }: Props) {
         alt={team.name}
         width={px}
         height={px}
-        className={`${cls} rounded-lg object-contain`}
+        className={`${cls} team-logo rounded-lg object-contain`}
         // Logos in /public are pre-sized to 144px, so skip the image optimizer
         unoptimized
         onError={() => setImgError(true)}

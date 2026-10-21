@@ -53,7 +53,11 @@ nations are `rugby-<name>` (shared by all four rugby international competitions)
 - **Next.js 16.3 (App Router)**, React 19.2, TypeScript (strict). Next 16 differs from older versions; see AGENTS.md.
   The bundled docs at `node_modules/next/dist/docs/` only exist after `npm install`.
 - **Tailwind CSS v4** via `@tailwindcss/postcss` (no `tailwind.config`; styles in [src/app/globals.css](src/app/globals.css)).
-  Dark zinc palette, emerald accent.
+  Zinc palette, emerald accent. **Colour themes** (Settings → Theme: Dark, the default; Blue; Light) work by
+  re-pointing Tailwind's `--color-zinc-*` (and, for Light, `--color-emerald-300/400`) variables under
+  `:root[data-theme=…]` in `globals.css`, by role (950 page, 900 cards, 800 borders, 500→100 text). So **style UI with
+  `zinc-*` classes, not `text-white`/`bg-black`**, or it won't follow the theme; use `zinc-50` for "brightest text".
+  League banners use `neutral-*` and brand colours so they look the same in every theme.
 - **Drizzle ORM** + **postgres.js** against **Supabase Postgres** (pooler, so `prepare: false` in [src/db/index.ts](src/db/index.ts)).
 - **Vercel** hosting (team `jhaynes-projects`, project `fixture`). The account is on Pro, but the app is built to fit
   the **Hobby** plan (see **Hosting costs**). The sync is scheduled by **Supabase pg_cron**
@@ -137,6 +141,9 @@ breaks hydration (React #418).
     The feed renders right after, already grouped by local day with local kickoff times, filters and the saved
     tab applied. An earlier version rendered UTC times and days first, which visibly jumped on load; don't
     reintroduce viewer-dependent content into the server render. `DateGroup`/`FixtureCard` are client-only.
+  - **Day headings** (`DateGroup`): the day ("Today", "Tomorrow", "Yesterday" or the weekday) plus the date, always
+    ("Thursday 22nd October"; `formatDateHeading`). Each heading is `sticky` under the app header, and the divider to
+    the next day sits inside the section, so a heading stays up until the next day's heading pushes it out.
   - **Refresh:** while any fixture is live (or past kickoff but still `scheduled`), it calls `router.refresh()` every
     2 min while the tab is visible. It also refreshes when the tab or PWA comes back after more than 5 min. Both
     re-request the ISR-cached route; keep any future polling on cached data too.
@@ -144,7 +151,7 @@ breaks hydration (React #418).
   `leagueBanner(slug)` in [src/lib/league-theme.ts](src/lib/league-theme.ts) (shared with the menu). It uses
   `TeamMatchLayout` when both teams exist and `EventLayout` otherwise (motorsport: event name + podium from
   `sportMeta`). In results, the loser's name and score are grey (a draw keeps both white). Followed teams get an
-  emerald star badge on the logo's corner (`TeamSide`, via `usePreferences`). Finished games get a `ResultFooter`:
+  gold star badge on the logo's corner (`TeamSide`, via `usePreferences`). Finished games get a `ResultFooter`:
   a **Highlights** link (`sportMeta.video`, when there is one) and, for football, a **Match details** toggle that
   opens `MatchDetailsPanel`, which fetches `/api/fixtures/[id]/details` on first open (see **Match details**).
 - **[src/components/tables/LeagueTables.tsx](src/components/tables/LeagueTables.tsx)**: the Tables tab. It shows one
@@ -155,7 +162,7 @@ breaks hydration (React #418).
 - **[src/components/layout/AppHeader.tsx](src/components/layout/AppHeader.tsx)**: a 3-column grid. On the left,
   `NavDrawer` (hamburger + left drawer, portalled to `<body>` so the bottom nav can't cover it). In the middle, the
   centred logo. On the right, `HeaderClock` (today's date/time, client-only). The drawer holds `LeagueFilterList`
-  and a placeholder **Settings** button that does nothing yet. While it's open, the page behind can't scroll: `NavDrawer` blocks
+  and a **Settings** link to `/settings`. While it's open, the page behind can't scroll: `NavDrawer` blocks
   `wheel`/`touchmove` on the overlay except inside the drawer's list. `overflow: hidden` on `<body>` does nothing
   here, because `<html>` is `overflow-y: scroll`.
 - **[src/lib/fixtures.ts](src/lib/fixtures.ts)**: the read path, with DB or mock data. `getFixtures`/`getCachedFixtures`
@@ -184,6 +191,12 @@ are already one team's games, so `hasTeamFilter` hides their chevron and they ar
 - a hidden league shows nothing;
 - a "mine" league shows only fixtures with a followed team;
 - motorsport (no teams) is exempt from "mine".
+
+The colour theme is separate: `localStorage` `fixture:theme` ([src/lib/theme.ts](src/lib/theme.ts), constants in
+[src/lib/theme-script.ts](src/lib/theme-script.ts), which the server layout can import). An inline script in the root
+layout's `<head>` (`THEME_SCRIPT`, allowed by the CSP's `'unsafe-inline'`) sets `data-theme` on `<html>` and the
+`theme-color` meta before first paint, so a saved theme never flashes; `<html>` has `suppressHydrationWarning` for
+that attribute. iOS reads the status-bar style only at install, so it stays `black-translucent` in every theme.
 
 The server render shows a skeleton, so a returning viewer's filters are already applied when the feed appears. Still
 open in #16: an empty first-load call to action for new visitors.
@@ -319,6 +332,7 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
 | Route | Purpose |
 |---|---|
 | `GET /` | The app |
+| `GET /settings` | Settings (static; everything on it is read and saved on the device). Currently just the colour theme. |
 | `GET /api/fixtures/[id]/details` | Goals, red cards and stats for a finished football fixture (our fixture ID). 404 for anything else. CDN-cached a day once complete, 5 min while TheSportsDB is still filling in. |
 | `GET /api/cron/sync[?force]` | Runs the sync. Requires `Authorization: Bearer $CRON_SECRET`. Returns `{ ok, synced, skipped, processed, changed, rolled, errors }`. `maxDuration = 60`. |
 | `/icon.svg`, `/apple-icon.png`, `/favicon.ico` | File-based metadata icons in `src/app/` (don't also put `icon.svg` in `public/`; the paths would clash) |
@@ -426,6 +440,15 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
     Image Optimization, so **resize PNG/JPG logos to at most 144 px before committing** (3× the largest 48 px
     display size).
   - TheSportsDB badges (`strBadge`) are a good source: download them, then `sharp().trim().resize(144, 144, { fit: 'inside' })`.
+  - **Logos are dark-first.** The app was dark-only until the Light theme, and many logos have white parts (white
+    text or outlines) that vanish on white. Check every new logo on a light card as well as a dark one.
+    - **Team logos:** in Light, `.team-logo` (on `TeamAvatar`) gets a faint outline in `globals.css`. That rescues the
+      All Blacks' fern but not logos that are mostly white line-work. For those, find a version made for light
+      backgrounds.
+    - **League logos:** these always sit on dark surfaces in every theme (the banners, and the Tables chips, which use
+      `neutral-*`). Keep it that way. Where one sits on the card itself (motorsport cards), Light swaps in a
+      light-background version from `LIGHT_BACKGROUND_LOGO` in `league-theme.ts` (only Supercars so far). For
+      theme-specific markup, use the `light:` variant from `globals.css`.
 - [next.config.ts](next.config.ts) sets a strict CSP (`img-src 'self' data: blob:`, `connect-src 'self'`). Remote
   images or API calls from the browser need CSP changes and `images.remotePatterns`.
 - The repo has both `README.md` (create-next-app boilerplate) and `readme.md` (`#SportsApp`). Those names collide on
