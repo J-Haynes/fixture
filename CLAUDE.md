@@ -430,3 +430,17 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
   images or API calls from the browser need CSP changes and `images.remotePatterns`.
 - The repo has both `README.md` (create-next-app boilerplate) and `readme.md` (`#SportsApp`). Those names collide on
   case-insensitive filesystems.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `J-Haynes/fixture`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root, created only when first needed. See `docs/agents/domain.md`.
