@@ -15,7 +15,7 @@
   A simple, mobile-first PWA sports app without social/advertising/gambling noise.
 </p>
 
-<!-- DEMO VIDEO -->
+https://github.com/user-attachments/assets/2ec4d675-4541-4894-8335-6102f9a63222
 
 ## Features
 
