@@ -15,7 +15,9 @@
   A simple, mobile-first PWA sports app without social/advertising/gambling noise.
 </p>
 
-https://github.com/user-attachments/assets/2ec4d675-4541-4894-8335-6102f9a63222
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/e6e27aae-a31a-440c-99ae-0924614073d7" alt="Fixture demo" width="320">
+</p>
 
 ## Features
 
