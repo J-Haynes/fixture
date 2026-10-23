@@ -451,8 +451,8 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
       theme-specific markup, use the `light:` variant from `globals.css`.
 - [next.config.ts](next.config.ts) sets a strict CSP (`img-src 'self' data: blob:`, `connect-src 'self'`). Remote
   images or API calls from the browser need CSP changes and `images.remotePatterns`.
-- The repo has both `README.md` (create-next-app boilerplate) and `readme.md` (`#SportsApp`). Those names collide on
-  case-insensitive filesystems.
+- `README.md` is the public project page (logo, description, demo GIF, setup). Keep its league list and scripts in
+  step with this file.
 
 ## Agent skills
 
