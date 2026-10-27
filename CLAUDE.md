@@ -95,7 +95,9 @@ revalidation. Seeding leagues/teams is invisible until fixtures exist (the menu 
 season has fixtures), so seed ahead of a deploy, but don't import fixtures for a new league before the code (config,
 logos, banner) is live. Running `npm run sync` against a local dev server with new `LEAGUE_CONFIG` entries counts as
 importing. Locally, `unstable_cache` entries persist
-in `.next/cache/fetch-cache` across builds; delete it if a local build shows stale data.
+in `.next/cache/fetch-cache` across builds (`.next/dev/cache/fetch-cache` for `next dev`, which also keeps them in
+memory until restarted); delete it if a local build shows stale data. Homepage on the owner's server is also a
+`next-server` process (in Docker), so stop a local dev server by PID, never `pkill -f next`.
 
 ## Environment variables (`.env.local`, git-ignored)
 
@@ -334,6 +336,7 @@ deploying code that depends on it.** The sync queries `seasons.last_synced_at`, 
 | `GET /` | The app |
 | `GET /settings` | Settings (static; everything on it is read and saved on the device). Currently just the colour theme. |
 | `GET /api/fixtures/[id]/details` | Goals, red cards and stats for a finished football fixture (our fixture ID). 404 for anything else. CDN-cached a day once complete, 5 min while TheSportsDB is still filling in. |
+| `GET /api/feed` | Public JSON feed for dashboards (e.g. Homepage's `customapi` widget). `?view=upcoming\|results` (default upcoming), `limit` (1–50, default 10), `leagues`/`teams` (comma-separated slugs), `tz` (IANA zone for the `kickoff`/`summary` labels, default `Pacific/Auckland`). Reads `getCachedFixtures` with the page's ±14-day window (no DB query), same upcoming/results rules as the feed. CORS `*`, CDN-cached 2 min. Consumer docs (fields, Homepage config) in [docs/feed-api.md](docs/feed-api.md); keep them in step. |
 | `GET /api/cron/sync[?force]` | Runs the sync. Requires `Authorization: Bearer $CRON_SECRET`. Returns `{ ok, synced, skipped, processed, changed, rolled, errors }`. `maxDuration = 60`. |
 | `/icon.svg`, `/apple-icon.png`, `/favicon.ico` | File-based metadata icons in `src/app/` (don't also put `icon.svg` in `public/`; the paths would clash) |
 

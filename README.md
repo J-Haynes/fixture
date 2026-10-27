@@ -54,6 +54,11 @@ every 15 minutes on match days, and every few hours otherwise. It fetches only t
 writes only what changed. The page itself is statically rendered and cached, and is regenerated only when the data
 changes, so viewers never hit the database directly.
 
+## JSON feed
+
+`https://www.fixture.nz/api/feed` serves upcoming fixtures or recent results as JSON, filterable by league and team,
+for dashboards such as [Homepage](https://gethomepage.dev). See [docs/feed-api.md](docs/feed-api.md).
+
 ## Running locally
 
 ```bash
