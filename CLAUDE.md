@@ -459,6 +459,12 @@ The logo master is [src/app/icon.svg](src/app/icon.svg). The manifest uses it pl
 
 ## Agent skills
 
+### Learning
+
+**The owner is learning this codebase** so they can explain it in interviews (owner's decision, 28 Oct 2026): every
+feature is also a lesson. When building or changing a feature, follow the `learn` skill
+(`.claude/skills/learn/SKILL.md`), and keep `docs/LEARNING.md` (what they can and can't explain yet) current.
+
 ### Issue tracker
 
 GitHub Issues on `J-Haynes/fixture`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
