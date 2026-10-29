@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { getCachedFixtures } from '@/lib/fixtures';
-import type { Fixture } from '@/lib/types';
+import type { Fixture, Team } from '@/lib/types';
 
 // A JSON feed for dashboards (e.g. Homepage's customapi widget). It reads the same cached
 // ±14-day window as the page, so a request never queries the DB, and the CDN absorbs polling.
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       ? b.scheduledAt.localeCompare(a.scheduledAt)
       : a.scheduledAt.localeCompare(b.scheduledAt))
     .slice(0, limit)
-    .map(f => toItem(f, when));
+    .map(f => toItem(f, when, request.nextUrl.origin));
 
   return Response.json(
     { view, updatedAt: now.toISOString(), items },
@@ -75,7 +75,16 @@ export async function GET(request: NextRequest) {
   );
 }
 
-function toItem(f: Fixture, when: Intl.DateTimeFormat) {
+// Logos are stored as site paths (e.g. /rugby/blues.png); the feed is read from other sites, so make them absolute
+function absolute(url: string | undefined, origin: string) {
+  return url ? new URL(url, origin).href : null;
+}
+
+function team(t: Team | undefined, origin: string) {
+  return t ? { name: t.name, slug: t.slug, logo: absolute(t.logoUrl, origin) } : null;
+}
+
+function toItem(f: Fixture, when: Intl.DateTimeFormat, origin: string) {
   const hasScore = f.homeScore != null && f.awayScore != null;
   const score    = hasScore ? `${f.homeScore}–${f.awayScore}` : undefined;
   const title    = f.homeTeam && f.awayTeam
@@ -95,10 +104,11 @@ function toItem(f: Fixture, when: Intl.DateTimeFormat) {
     id:          f.id,
     league:      f.league.shortName ?? f.league.name,
     leagueSlug:  f.league.slug,
+    leagueLogo:  absolute(f.league.logoUrl, origin),
     round:       f.round ?? null,
     title,
-    home:        f.homeTeam ? { name: f.homeTeam.name, slug: f.homeTeam.slug } : null,
-    away:        f.awayTeam ? { name: f.awayTeam.name, slug: f.awayTeam.slug } : null,
+    home:        team(f.homeTeam, origin),
+    away:        team(f.awayTeam, origin),
     homeScore:   f.homeScore ?? null,
     awayScore:   f.awayScore ?? null,
     score:       score ?? null,

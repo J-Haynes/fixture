@@ -39,10 +39,11 @@ e.g. `/api/feed?leagues=premier-league&limit=50`. Clubs keep one slug across com
       "id": 1234,
       "league": "Premier League",
       "leagueSlug": "premier-league",
+      "leagueLogo": "https://www.fixture.nz/logos/premier-league.png",
       "round": "Round 10",
       "title": "Arsenal v Chelsea",
-      "home": { "name": "Arsenal", "slug": "epl-arsenal" },
-      "away": { "name": "Chelsea", "slug": "epl-chelsea" },
+      "home": { "name": "Arsenal", "slug": "epl-arsenal", "logo": "https://www.fixture.nz/epl/arsenal.png" },
+      "away": { "name": "Chelsea", "slug": "epl-chelsea", "logo": "https://www.fixture.nz/epl/chelsea.png" },
       "homeScore": null,
       "awayScore": null,
       "score": null,
@@ -60,7 +61,8 @@ e.g. `/api/feed?leagues=premier-league&limit=50`. Clubs keep one slug across com
 |---|---|
 | `title` | "Home v Away", or the event name for motorsport (no teams). |
 | `league` | Short name when there is one (e.g. `SRP`), else the full name. |
-| `home` / `away` | `null` for motorsport. |
+| `leagueLogo` | Absolute URL of the league's logo, or `null`. Logos are drawn for dark backgrounds. |
+| `home` / `away` | `null` for motorsport. `logo` is an absolute URL of the team's badge, or `null`. |
 | `score` | `"2–1"` (en dash) once there is a score, else `null`. |
 | `podium` | Motorsport results: driver names, first to third. Otherwise `null`. |
 | `status` | `scheduled`, `live`, `finished`, `postponed` or `cancelled`. |
